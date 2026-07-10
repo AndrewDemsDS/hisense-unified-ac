@@ -39,6 +39,34 @@ tiles can be hidden and the special modes live inside the climate as presets.
 Then hide the now-redundant native entities (the Power switch and the raw
 special-mode switches) if you like — the unified entity covers them.
 
+## Lovelace card
+
+The unified entity renders in the built-in **Thermostat** card. A HA integration
+can't inject a *native* Lovelace card (only JS cards can be backend-registered),
+so add it to a dashboard yourself. Recommended layout — HVAC modes, fan/swing as
+icons, and the special modes as a preset dropdown:
+
+```yaml
+type: vertical-stack
+cards:
+  - type: heading
+    heading: Living Room A/C
+    heading_style: title
+    icon: mdi:air-conditioner
+  - type: thermostat
+    entity: climate.living_room_unified_ac
+    features:
+      - type: climate-hvac-modes
+      - type: climate-fan-modes
+        style: icons
+      - type: climate-swing-modes
+        style: icons
+      - type: climate-preset-modes
+        style: dropdown
+```
+
+Point `entity` at your unit (one card per A/C).
+
 ## AI assistance
 
 Parts of this integration were developed with AI assistance.
