@@ -1,0 +1,22 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Hisense W41H1 Unified AC",
+        "description": "Pick the de-clouded A/C's native Matter climate entity. The fan, eco/quiet/turbo switches and sleep select are auto-detected from the same device; override any below if needed.",
+        "data": {
+          "base_climate": "Native Matter climate entity",
+          "name": "Name",
+          "fan": "Fan entity (optional override)",
+          "eco_switch": "Eco switch (optional override)",
+          "quiet_switch": "Quiet switch (optional override)",
+          "turbo_switch": "Turbo switch (optional override)",
+          "sleep_select": "Sleep select (optional override)"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This A/C is already set up."
+    }
+  }
+}
