@@ -17,6 +17,8 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.selector import (
     EntitySelector,
     EntitySelectorConfig,
+    NumberSelector,
+    NumberSelectorConfig,
     TextSelector,
 )
 
@@ -24,10 +26,13 @@ from .const import (
     CONF_BASE_CLIMATE,
     CONF_ECO,
     CONF_FAN,
+    CONF_MATTER_URL,
     CONF_NAME,
+    CONF_NODE_ID,
     CONF_QUIET,
     CONF_SLEEP,
     CONF_TURBO,
+    DEFAULT_MATTER_URL,
     DOMAIN,
 )
 
@@ -83,6 +88,13 @@ class HisenseUnifiedACConfigFlow(ConfigFlow, domain=DOMAIN):
                 if user_input.get(key):
                     data[key] = user_input[key]
 
+            # Optional: a matter-server WS URL + Matter node id enable the diagnostics
+            # entities (compressor Hz, faults, capabilities) read from the mfg cluster.
+            if user_input.get(CONF_MATTER_URL):
+                data[CONF_MATTER_URL] = user_input[CONF_MATTER_URL]
+            if user_input.get(CONF_NODE_ID) is not None:
+                data[CONF_NODE_ID] = int(user_input[CONF_NODE_ID])
+
             return self.async_create_entry(title=data[CONF_NAME], data=data)
 
         schema = vol.Schema(
@@ -105,6 +117,12 @@ class HisenseUnifiedACConfigFlow(ConfigFlow, domain=DOMAIN):
                 ),
                 vol.Optional(CONF_SLEEP): EntitySelector(
                     EntitySelectorConfig(domain="select")
+                ),
+                vol.Optional(
+                    CONF_MATTER_URL, default=DEFAULT_MATTER_URL
+                ): TextSelector(),
+                vol.Optional(CONF_NODE_ID): NumberSelector(
+                    NumberSelectorConfig(mode="box", min=1, step=1)
                 ),
             }
         )
