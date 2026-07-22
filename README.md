@@ -12,6 +12,24 @@ Hisense **AEH-W41H1** A/C's native Matter entities into **one climate entity**:
 It replaces the hand-maintained `climate_template` YAML package: units are added
 through the UI (config flow), one entry per A/C.
 
+## Prerequisite: the module must run the custom firmware
+
+This is only the Home Assistant side. It assumes your AEH-W41H1 already runs the
+de-cloud Matter firmware, and a stock module does not work with it.
+
+Out of the box the AEH-W41H1 is Wi-Fi + ConnectLife cloud, with no usable local
+control. The stock firmware does still ship a Matter stack, but a broken, test-grade
+one: it commissions only with attestation bypass, and a cloud-paired unit usually
+wedges partway through commissioning. So a stock unit looks Wi-Fi only.
+
+Flashing the custom firmware fixes that, over the air on many units (it commissions
+the stock test-Matter and pushes a real image through its OTA Requestor) or with a
+CH341A SPI clip as a fallback. The firmware, the flashing steps, and the RS-485
+protocol work live in the firmware project:
+[AndrewDemsDS/hisense-w41h1](https://github.com/AndrewDemsDS/hisense-w41h1).
+
+Order: flash with the firmware project first, then add this integration.
+
 ## Why
 
 HA's Matter integration exposes the W41H1 as a climate **plus** a separate fan, a
