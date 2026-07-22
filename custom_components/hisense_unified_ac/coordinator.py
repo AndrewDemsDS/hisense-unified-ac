@@ -60,9 +60,18 @@ class HisenseDiagCoordinator(DataUpdateCoordinator[dict[str, int | None]]):
                 "args": {"node_id": self._node_id, "attribute_path": path},
             }
         )
+        # Bound the TOTAL wait per attribute (not per message): interleaved traffic on the
+        # socket must not be able to extend it indefinitely. Treat a peer-initiated CLOSE as
+        # terminal too (aiohttp returns CLOSE, then CLOSED, for a graceful server close).
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + 15
         while True:
-            msg = await ws.receive(timeout=15)
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                raise UpdateFailed(f"timed out waiting for {path}")
+            msg = await ws.receive(timeout=remaining)
             if msg.type in (
+                aiohttp.WSMsgType.CLOSE,
                 aiohttp.WSMsgType.CLOSED,
                 aiohttp.WSMsgType.CLOSING,
                 aiohttp.WSMsgType.ERROR,

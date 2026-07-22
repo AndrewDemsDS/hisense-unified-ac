@@ -26,8 +26,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     store: dict = {}
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = store
 
-    url = entry.data.get(CONF_MATTER_URL)
-    node_id = entry.data.get(CONF_NODE_ID)
+    cfg = {**entry.data, **entry.options}  # options (set post-setup) override data
+    url = cfg.get(CONF_MATTER_URL)
+    node_id = cfg.get(CONF_NODE_ID)
     if url and node_id is not None:
         coord = HisenseDiagCoordinator(
             hass, url, int(node_id), entry.data.get(CONF_NAME) or "Unified AC"
