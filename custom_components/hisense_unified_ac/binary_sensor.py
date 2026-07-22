@@ -1,8 +1,11 @@
 """Diagnostic binary sensors: A/C faults (from Faults1) + RS-485 bus link health.
 
-Faults come from the packed Faults1 mfg attribute (full per-bit detail in attributes);
-bus link mirrors the firmware's #56 liveness (the base climate entity goes unavailable on
-bus silence), needing no firmware/matter-server change (docs/14 Phase 1b).
+Faults come from the packed Faults1 mfg attribute. The aggregate FaultsBinarySensor
+carries full per-bit detail in attributes; one FaultBitBinarySensor per FAULT1_BITS
+entry (#86) additionally exposes each named fault as its own PROBLEM entity, so a
+user (or automation) can act on "condensate tray full" without parsing attributes.
+Bus link mirrors the firmware's #56 liveness (the base climate entity goes unavailable
+on bus silence), needing no firmware/matter-server change (docs/14 Phase 1b).
 """
 
 from __future__ import annotations
@@ -40,6 +43,10 @@ async def async_setup_entry(
     coord: HisenseDiagCoordinator | None = store.get("diag")
     if coord is not None:
         entities.append(FaultsBinarySensor(coord, entry))
+        entities.extend(
+            FaultBitBinarySensor(coord, entry, bit, key, name)
+            for bit, key, name in FAULT1_BITS
+        )
     if entry.data.get(CONF_BASE_CLIMATE):
         entities.append(BusLinkBinarySensor(entry))
     async_add_entities(entities)
@@ -63,6 +70,7 @@ class FaultsBinarySensor(CoordinatorEntity[HisenseDiagCoordinator], BinarySensor
     _attr_has_entity_name = True
     _attr_name = "Faults"
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_entity_registry_enabled_default = True
 
     def __init__(self, coord: HisenseDiagCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coord)
@@ -93,6 +101,49 @@ class FaultsBinarySensor(CoordinatorEntity[HisenseDiagCoordinator], BinarySensor
         active = [name for bit, _key, name in FAULT1_BITS if (v >> bit) & 1]
         attrs["active"] = active or ["none"]
         return attrs
+
+
+class FaultBitBinarySensor(
+    CoordinatorEntity[HisenseDiagCoordinator], BinarySensorEntity
+):
+    """PROBLEM sensor for one named f_e_* fault bit (#86).
+
+    Gates on the same Faults1 VALID bit as the aggregate: unavailable whenever the
+    firmware hasn't reported a valid Faults1 read, on otherwise reflects just this bit.
+    """
+
+    _attr_has_entity_name = True
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    # Only 18 of these, all diagnostically useful, so enabled by default (unlike a
+    # long tail of low-value attributes that would want opt-in).
+    _attr_entity_registry_enabled_default = True
+
+    def __init__(
+        self,
+        coord: HisenseDiagCoordinator,
+        entry: ConfigEntry,
+        bit: int,
+        key: str,
+        name: str,
+    ) -> None:
+        super().__init__(coord)
+        self._bit = bit
+        self._attr_name = name
+        self._attr_unique_id = f"{entry.entry_id}_fault_{key}"
+        self._attr_device_info = _device_info(entry)
+
+    def _valid_value(self) -> int | None:
+        v = self.coordinator.data.get("faults1")
+        if isinstance(v, int) and (v >> FAULTS1_VALID_BIT) & 1:
+            return v
+        return None
+
+    @property
+    def is_on(self) -> bool | None:
+        v = self._valid_value()
+        if v is None:
+            return None
+        return bool((v >> self._bit) & 1)
 
 
 class BusLinkBinarySensor(BinarySensorEntity):
