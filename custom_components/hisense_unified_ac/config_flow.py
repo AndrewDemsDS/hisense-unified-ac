@@ -12,7 +12,13 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
+from homeassistant.core import callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.selector import (
     EntitySelector,
@@ -67,6 +73,14 @@ class HisenseUnifiedACConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for a unified A/C."""
 
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: ConfigEntry,
+    ) -> HisenseUnifiedACOptionsFlow:
+        """Enable editing the matter-server URL + node id after setup (for diagnostics)."""
+        return HisenseUnifiedACOptionsFlow()
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -127,3 +141,38 @@ class HisenseUnifiedACConfigFlow(ConfigFlow, domain=DOMAIN):
             }
         )
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+
+
+class HisenseUnifiedACOptionsFlow(OptionsFlow):
+    """Options: set the matter-server WS URL + Matter node id to enable the diagnostics.
+
+    This is how an existing entry gets `node_id` (and `matter_url`) after initial setup,
+    without deleting it -- both are needed for the compressor Hz / faults / capabilities
+    entities to appear. Changing them reloads the entry (see __init__ update listener).
+    """
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if user_input is not None:
+            opts: dict[str, Any] = {}
+            if user_input.get(CONF_MATTER_URL):
+                opts[CONF_MATTER_URL] = user_input[CONF_MATTER_URL]
+            if user_input.get(CONF_NODE_ID) is not None:
+                opts[CONF_NODE_ID] = int(user_input[CONF_NODE_ID])
+            return self.async_create_entry(data=opts)
+
+        cur = {**self.config_entry.data, **self.config_entry.options}
+        schema = vol.Schema(
+            {
+                vol.Optional(
+                    CONF_MATTER_URL,
+                    default=cur.get(CONF_MATTER_URL) or DEFAULT_MATTER_URL,
+                ): TextSelector(),
+                vol.Optional(
+                    CONF_NODE_ID,
+                    description={"suggested_value": cur.get(CONF_NODE_ID)},
+                ): NumberSelector(NumberSelectorConfig(mode="box", min=1, step=1)),
+            }
+        )
+        return self.async_show_form(step_id="init", data_schema=schema)
