@@ -1,0 +1,36 @@
+{
+  "entity": {
+    "sensor": {
+      "compressor_frequency": { "default": "mdi:sine-wave" },
+      "capabilities": { "default": "mdi:format-list-checks" }
+    },
+    "binary_sensor": {
+      "faults": {
+        "default": "mdi:shield-check",
+        "state": { "on": "mdi:shield-alert" }
+      },
+      "bus_link": {
+        "default": "mdi:lan-disconnect",
+        "state": { "on": "mdi:lan-connect" }
+      },
+      "in_temp": { "default": "mdi:thermometer" },
+      "in_coil_temp": { "default": "mdi:coolant-temperature" },
+      "in_humidity": { "default": "mdi:water-percent" },
+      "water_full": { "default": "mdi:cup-water" },
+      "in_fan_motor": { "default": "mdi:fan" },
+      "grille": { "default": "mdi:arrow-up-down-bold" },
+      "in_vzero": { "default": "mdi:sine-wave" },
+      "in_com": { "default": "mdi:swap-horizontal" },
+      "in_display": { "default": "mdi:monitor" },
+      "in_keys": { "default": "mdi:keyboard" },
+      "in_wifi": { "default": "mdi:wifi" },
+      "in_ele": { "default": "mdi:flash" },
+      "in_eeprom": { "default": "mdi:memory" },
+      "out_eeprom": { "default": "mdi:memory" },
+      "out_coil_temp": { "default": "mdi:coolant-temperature" },
+      "out_gas_temp": { "default": "mdi:thermometer-lines" },
+      "out_temp": { "default": "mdi:thermometer" },
+      "over_temp": { "default": "mdi:thermometer-high" }
+    }
+  }
+}
