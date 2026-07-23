@@ -69,6 +69,7 @@ class FaultsBinarySensor(CoordinatorEntity[HisenseDiagCoordinator], BinarySensor
 
     _attr_has_entity_name = True
     _attr_name = "Faults"
+    _attr_translation_key = "faults"  # icon in icons.json (state-based)
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
     _attr_entity_registry_enabled_default = True
 
@@ -129,6 +130,8 @@ class FaultBitBinarySensor(
         super().__init__(coord)
         self._bit = bit
         self._attr_name = name
+        # Per-fault icon via icons.json, keyed by the fault slug (name stays _attr_name).
+        self._attr_translation_key = key
         self._attr_unique_id = f"{entry.entry_id}_fault_{key}"
         self._attr_device_info = _device_info(entry)
 
@@ -156,6 +159,7 @@ class BusLinkBinarySensor(BinarySensorEntity):
 
     _attr_has_entity_name = True
     _attr_name = "Bus link"
+    _attr_translation_key = "bus_link"  # icon in icons.json (state-based)
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
     _attr_should_poll = False
 

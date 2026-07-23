@@ -54,10 +54,10 @@ class CompressorHzSensor(CoordinatorEntity[HisenseDiagCoordinator], SensorEntity
 
     _attr_has_entity_name = True
     _attr_name = "Compressor frequency"
+    _attr_translation_key = "compressor_frequency"  # icon in icons.json
     _attr_native_unit_of_measurement = UnitOfFrequency.HERTZ
     _attr_device_class = SensorDeviceClass.FREQUENCY
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_icon = "mdi:sine-wave"
 
     def __init__(self, coord: HisenseDiagCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coord)
@@ -74,8 +74,8 @@ class CapabilitiesSensor(CoordinatorEntity[HisenseDiagCoordinator], SensorEntity
 
     _attr_has_entity_name = True
     _attr_name = "Capabilities"
+    _attr_translation_key = "capabilities"  # icon in icons.json
     _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_icon = "mdi:format-list-checks"
 
     def __init__(self, coord: HisenseDiagCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coord)
