@@ -1,0 +1,42 @@
+name: Release
+
+# Standard versioning: when the integration's manifest version changes on main,
+# cut a matching GitHub release so HACS can offer the update. The manifest version
+# is the single source of truth; the tag is v<version>.
+on:
+  push:
+    branches: [main]
+    paths:
+      - custom_components/hisense_unified_ac/manifest.json
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read manifest version
+        id: v
+        run: |
+          version="$(jq -r .version custom_components/hisense_unified_ac/manifest.json)"
+          if [ -z "$version" ] || [ "$version" = "null" ]; then
+            echo "::error::manifest.json has no version"; exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Create release if the tag is new
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v${{ steps.v.outputs.version }}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "release $tag already exists -- nothing to do"
+          else
+            gh release create "$tag" --title "$tag" --generate-notes --target "${{ github.sha }}"
+          fi

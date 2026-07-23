@@ -1,0 +1,33 @@
+name: Validate
+
+# Standard HACS repo hygiene: prove the repo stays HACS-installable and the
+# integration manifest stays valid on every push/PR (and daily, to catch drift
+# as HA/HACS evolve).
+on:
+  push:
+    branches: [main]
+  pull_request: {}
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  hacs:
+    name: HACS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hacs/action@main
+        with:
+          category: integration
+          # Brand images are bundled locally under brand/ (HA 2026.3+); the
+          # home-assistant/brands CDN no longer accepts custom integrations, so
+          # skip the (now-deprecated) brands check.
+          ignore: brands
+
+  hassfest:
+    name: hassfest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master
