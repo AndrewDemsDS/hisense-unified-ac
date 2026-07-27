@@ -40,9 +40,11 @@ tiles can be hidden and the special modes live inside the climate as presets.
 ## Requirements
 
 - The A/C already commissioned into HA over Matter.
-- Dry / fan-only / single-setpoint unlocked on the native climate (HA gates those
-  on a vendor allow-list; the companion `matter_ac_unlock` component adds the
-  W41H1's test IDs `0xFFF1/0x8001`).
+- Dry / fan-only / single-setpoint unlocked on the native climate (HA gates those on a
+  vendor allow-list; the companion
+  [`ha-matter-extra-hvac-modes`](https://github.com/AndrewDemsDS/ha-matter-extra-hvac-modes)
+  integration, domain `matter_extra_hvac_modes`, lifts that gate for test-vendor `0xFFF1`
+  devices).
 
 ## Install (HACS)
 

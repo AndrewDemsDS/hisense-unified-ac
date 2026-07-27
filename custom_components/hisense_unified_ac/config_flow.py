@@ -58,11 +58,15 @@ def _derive_siblings(hass, base_climate: str) -> dict[str, str]:
         if domain == "fan" and CONF_FAN not in out:
             out[CONF_FAN] = e.entity_id
         elif domain == "switch":
-            if "(3)" in original:
+            low = original.lower()
+            # Firmware labels these "Switch (Eco)" / "(Quiet)" / "(Turbo)"; the old
+            # "(3)/(4)/(5)" form has no digit to match, so it never fired. Keep it as
+            # a fallback for older builds.
+            if "eco" in low or "(3)" in original:
                 out[CONF_ECO] = e.entity_id
-            elif "(4)" in original:
+            elif "quiet" in low or "mute" in low or "(4)" in original:
                 out[CONF_QUIET] = e.entity_id
-            elif "(5)" in original:
+            elif "turbo" in low or "(5)" in original:
                 out[CONF_TURBO] = e.entity_id
         elif domain == "select" and "sleep" in original.lower():
             out[CONF_SLEEP] = e.entity_id
