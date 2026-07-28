@@ -1,0 +1,123 @@
+# TEMPORARY end-to-end test of hisense_unified_ac, driven through HA's own service
+# calls on the kitchen unit. Delete this file when done: it runs on every HA start.
+# Ends by putting the kitchen back to eco+quiet with sleep Off.
+automation:
+  - alias: "ZZ hisense_unified_ac selftest"
+    id: hu_selftest
+    mode: single
+    triggers:
+      - trigger: homeassistant
+        event: start
+    actions:
+      - delay: "00:02:30"   # backing Matter entities must be populated first
+
+      - action: system_log.write
+        data:
+          level: warning
+          logger: hu_selftest
+          message: >-
+            STEP0 advertised:
+            preset_modes={{ state_attr('climate.kitchen_unified_ac','preset_modes') }} |
+            preset={{ state_attr('climate.kitchen_unified_ac','preset_mode') }} |
+            fan_mode={{ state_attr('climate.kitchen_unified_ac','fan_mode') }} |
+            fan_modes={{ state_attr('climate.kitchen_unified_ac','fan_modes') }} |
+            hvac_modes={{ state_attr('climate.kitchen_unified_ac','hvac_modes') }} |
+            sleep_state={{ states('select.kitchen_kitchen_unified_ac_sleep_profile') }} |
+            sleep_options={{ state_attr('select.kitchen_kitchen_unified_ac_sleep_profile','options') }}
+
+      # 1. fan guard: quiet is on, so auto must be REFUSED (error logged, run continues)
+      - action: climate.set_fan_mode
+        target: { entity_id: climate.kitchen_unified_ac }
+        data: { fan_mode: auto }
+        continue_on_error: true
+      - action: system_log.write
+        data:
+          level: warning
+          logger: hu_selftest
+          message: >-
+            STEP1 after set_fan_mode(auto) with quiet on:
+            fan_mode={{ state_attr('climate.kitchen_unified_ac','fan_mode') }}
+            (expect low + a ServiceValidationError naming quiet just above; quiet is on at start)
+
+      # 2. the mode quiet does allow must still work
+      - action: climate.set_fan_mode
+        target: { entity_id: climate.kitchen_unified_ac }
+        data: { fan_mode: low }
+        continue_on_error: true
+      - action: system_log.write
+        data:
+          level: warning
+          logger: hu_selftest
+          message: >-
+            STEP2 after set_fan_mode(low) with quiet on:
+            fan_mode={{ state_attr('climate.kitchen_unified_ac','fan_mode') }} (expect low, no error)
+
+      # 3. clear presets so sleep can engage, then pick a NON-General profile
+      - action: climate.set_preset_mode
+        target: { entity_id: climate.kitchen_unified_ac }
+        data: { preset_mode: none }
+      - delay: "00:00:14"
+      - action: select.select_option
+        target: { entity_id: select.kitchen_kitchen_unified_ac_sleep_profile }
+        data: { option: Kids }
+      - delay: "00:00:16"
+      - action: system_log.write
+        data:
+          level: warning
+          logger: hu_selftest
+          message: >-
+            STEP3 sleep profile Kids selected:
+            sleep={{ states('select.kitchen_kitchen_unified_ac_sleep_profile') }} (expect Kids) |
+            climate preset={{ state_attr('climate.kitchen_unified_ac','preset_mode') }}
+            (expect none: sleep must not leak into presets) |
+            fan_mode={{ state_attr('climate.kitchen_unified_ac','fan_mode') }}
+
+      # 4. fan guard again, this time held by SLEEP rather than a switch
+      - action: climate.set_fan_mode
+        target: { entity_id: climate.kitchen_unified_ac }
+        data: { fan_mode: auto }
+        continue_on_error: true
+      - action: system_log.write
+        data:
+          level: warning
+          logger: hu_selftest
+          message: >-
+            STEP4 after set_fan_mode(auto) while sleep=Kids:
+            fan_mode={{ state_attr('climate.kitchen_unified_ac','fan_mode') }}
+            (expect refused, error naming sleep just above)
+
+      # 5. the combination preset, which also restores the baseline. The A/C is expected
+      #    to cancel the sleep profile by itself when eco engages.
+      - action: climate.set_preset_mode
+        target: { entity_id: climate.kitchen_unified_ac }
+        data: { preset_mode: eco_quiet }
+      - delay: "00:00:16"
+      - action: system_log.write
+        data:
+          level: warning
+          logger: hu_selftest
+          message: >-
+            STEP5 after preset eco_quiet:
+            preset={{ state_attr('climate.kitchen_unified_ac','preset_mode') }} (expect eco_quiet) |
+            sleep={{ states('select.kitchen_kitchen_unified_ac_sleep_profile') }}
+            (expect Off: the A/C cancels sleep when a special engages) |
+            fan_mode={{ state_attr('climate.kitchen_unified_ac','fan_mode') }}
+
+      # 6. make sure sleep really is back to Off, whatever the A/C did
+      - action: select.select_option
+        target: { entity_id: select.kitchen_kitchen_unified_ac_sleep_profile }
+        data: { option: "Off" }
+        continue_on_error: true
+      - delay: "00:00:14"
+      - action: system_log.write
+        data:
+          level: warning
+          logger: hu_selftest
+          message: >-
+            STEP6 FINAL kitchen:
+            preset={{ state_attr('climate.kitchen_unified_ac','preset_mode') }} |
+            sleep={{ states('select.kitchen_kitchen_unified_ac_sleep_profile') }} |
+            fan_mode={{ state_attr('climate.kitchen_unified_ac','fan_mode') }} |
+            hvac={{ states('climate.kitchen_unified_ac') }} |
+            temp={{ state_attr('climate.kitchen_unified_ac','temperature') }}
+            SELFTEST COMPLETE
