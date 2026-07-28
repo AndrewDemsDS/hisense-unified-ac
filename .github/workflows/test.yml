@@ -1,0 +1,38 @@
+name: Test
+
+# The QA gate. validate.yml proves the repo stays HACS-installable and the manifest valid;
+# this proves the code still behaves. Runs on every push and PR, plus daily, because half
+# of what can break here is Home Assistant changing under the integration rather than the
+# integration changing itself.
+on:
+  push:
+    branches: [main]
+  pull_request: {}
+  schedule:
+    - cron: "30 6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          # Unpinned on purpose: this repo tracks whatever HA users are actually running,
+          # so the daily run is what catches an upstream change early.
+          pip install homeassistant ruff
+
+      - name: Lint
+        run: |
+          ruff check custom_components tests
+          ruff format --check custom_components tests
+
+      - name: Tests
+        run: ./run_tests.sh

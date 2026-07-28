@@ -17,16 +17,9 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import (
-    CONF_NAME,
-    DOMAIN,
-    FEAT1_BITS,
-    FEATURES1_DEMAND_RESP_SHIFT,
-    FEATURES1_EXT_VALID_BIT,
-    FEATURES1_POWER_DISPLAY_SHIFT,
-    FEATURES1_VALID_BIT,
-)
+from .const import CONF_NAME, DOMAIN
 from .coordinator import HisenseDiagCoordinator
+from .features import decode_features1
 
 
 async def async_setup_entry(
@@ -83,16 +76,9 @@ class CapabilitiesSensor(CoordinatorEntity[HisenseDiagCoordinator], SensorEntity
         self._attr_device_info = _device_info(entry)
 
     def _decode(self) -> tuple[int | None, dict]:
-        v = self.coordinator.data.get("features1")
-        if not isinstance(v, int) or not (v >> FEATURES1_VALID_BIT) & 1:
+        attrs = decode_features1(self.coordinator.data.get("features1"))
+        if attrs is None:
             return None, {}
-        ext = bool((v >> FEATURES1_EXT_VALID_BIT) & 1)
-        attrs: dict[str, object] = {}
-        for bit, key, _name, is_ext in FEAT1_BITS:
-            # ext-tier flags are UNKNOWN (not False) when the reply was too short.
-            attrs[key] = None if (is_ext and not ext) else bool((v >> bit) & 1)
-        attrs["power_display"] = (v >> FEATURES1_POWER_DISPLAY_SHIFT) & 3
-        attrs["demand_resp"] = (v >> FEATURES1_DEMAND_RESP_SHIFT) & 3
         count = sum(1 for val in attrs.values() if val is True)
         return count, attrs
 

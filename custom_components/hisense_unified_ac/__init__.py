@@ -11,13 +11,15 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_MATTER_URL, CONF_NAME, CONF_NODE_ID, DOMAIN
+from .const import CONF_BASE_CLIMATE, CONF_MATTER_URL, CONF_NAME, CONF_NODE_ID, DOMAIN
 from .coordinator import HisenseDiagCoordinator
+from .discovery import derive_siblings
 
 PLATFORMS: list[Platform] = [
     Platform.CLIMATE,
     Platform.SENSOR,
     Platform.BINARY_SENSOR,
+    Platform.SELECT,
 ]
 
 
@@ -26,7 +28,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     store: dict = {}
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = store
 
-    cfg = {**entry.data, **entry.options}  # options (set post-setup) override data
+    # Re-derive the siblings every setup and use them for whatever the entry does not
+    # already name. An entry created before the firmware relabelled its switches stored
+    # no eco/quiet/turbo, which left those presets advertised but dead; this heals it.
+    # Stored values always win, so a manual override is never overwritten.
+    cfg = {
+        **derive_siblings(hass, entry.data[CONF_BASE_CLIMATE]),
+        **entry.data,
+        **entry.options,  # options (set post-setup) override data
+    }
+    store["config"] = cfg
     url = cfg.get(CONF_MATTER_URL)
     node_id = cfg.get(CONF_NODE_ID)
     if url and node_id is not None:

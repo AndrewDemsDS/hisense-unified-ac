@@ -2,8 +2,7 @@
 
 Pick the de-clouded A/C's native Matter *climate* entity; the flow auto-derives
 the sibling fan / eco-quiet-turbo switches / sleep select from the same device
-(matched by their firmware original names "Switch (3/4/5)" and "Sleep"). Each can
-be overridden manually if auto-detection misses.
+(see `discovery.py`). Each can be overridden manually if auto-detection misses.
 """
 
 from __future__ import annotations
@@ -19,7 +18,6 @@ from homeassistant.config_entries import (
     OptionsFlow,
 )
 from homeassistant.core import callback
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.selector import (
     EntitySelector,
     EntitySelectorConfig,
@@ -41,36 +39,7 @@ from .const import (
     DEFAULT_MATTER_URL,
     DOMAIN,
 )
-
-
-def _derive_siblings(hass, base_climate: str) -> dict[str, str]:
-    """Find the fan/switches/select that share the base climate's device."""
-    reg = er.async_get(hass)
-    ent = reg.async_get(base_climate)
-    out: dict[str, str] = {}
-    if ent is None or ent.device_id is None:
-        return out
-    for e in reg.entities.values():
-        if e.device_id != ent.device_id:
-            continue
-        domain = e.entity_id.split(".", 1)[0]
-        original = e.original_name or ""
-        if domain == "fan" and CONF_FAN not in out:
-            out[CONF_FAN] = e.entity_id
-        elif domain == "switch":
-            low = original.lower()
-            # Firmware labels these "Switch (Eco)" / "(Quiet)" / "(Turbo)"; the old
-            # "(3)/(4)/(5)" form has no digit to match, so it never fired. Keep it as
-            # a fallback for older builds.
-            if "eco" in low or "(3)" in original:
-                out[CONF_ECO] = e.entity_id
-            elif "quiet" in low or "mute" in low or "(4)" in original:
-                out[CONF_QUIET] = e.entity_id
-            elif "turbo" in low or "(5)" in original:
-                out[CONF_TURBO] = e.entity_id
-        elif domain == "select" and "sleep" in original.lower():
-            out[CONF_SLEEP] = e.entity_id
-    return out
+from .discovery import derive_siblings
 
 
 class HisenseUnifiedACConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -100,7 +69,7 @@ class HisenseUnifiedACConfigFlow(ConfigFlow, domain=DOMAIN):
                 CONF_BASE_CLIMATE: base,
                 CONF_NAME: user_input.get(CONF_NAME) or "Unified AC",
             }
-            data.update(_derive_siblings(self.hass, base))
+            data.update(derive_siblings(self.hass, base))
             # explicit selections override auto-derivation
             for key in (CONF_FAN, CONF_ECO, CONF_QUIET, CONF_TURBO, CONF_SLEEP):
                 if user_input.get(key):

@@ -21,9 +21,37 @@ PRESET_SLEEP = "sleep"
 # actually drives the A/C bus; auto uses the fan preset instead).
 FAN_PERCENT = {"low": 25, "medium": 58, "high": 100}
 
-# Sleep ModeSelect option that means "sleep on" / "sleep off".
-SLEEP_ON_OPTION = "General"
+# The sleep ModeSelect option that means "no sleep profile".
 SLEEP_OFF_OPTION = "Off"
+# Each remaining profile is also offered as a climate preset named with this prefix
+# ("General" -> "sleep_general"), so sleep is controllable from the thermostat card and
+# not only from its own select. One preset per profile, so choosing sleep never has to
+# guess which profile was meant.
+SLEEP_PRESET_PREFIX = "sleep_"
+# Its five profiles (ep6 cluster 80 SupportedModes 0-4), in firmware order. Only a
+# fallback for the sleep select's options: the live list from the underlying entity is
+# preferred, since the firmware owns this list.
+SLEEP_PROFILE_OPTIONS = ("Off", "General", "Old", "Young", "Kids")
+
+# This A/C debounces rapid commands: a special mode commanded too soon after another is
+# swallowed outright. Measured on node 14 by commanding eco then quiet at varying gaps:
+# 6 s FAILED repeatedly (quiet never engaged), 8 s and 12 s both engaged. 10 s is 8 with
+# margin, since the threshold sits between 6 and 8 and bus load varies. Note this is the
+# gap the NEXT command needs, not how long a mode takes to appear: once accepted, a mode
+# reports back in about 3 s. Only paid when a preset command sends more than one frame.
+COMBO_SETTLE_SECONDS = 10
+
+# Special modes that own the A/C's fan profile, and the fan mode each pins it to
+# (firmware/docs/05 "Special functions"). The A/C's quiet fan step has no Matter
+# FanMode of its own, so it reads back as Low. While one of these is on, any other fan
+# mode is overwritten about a second later by the next status downlink, so the unified
+# climate refuses the change instead of reporting success for something that undoes
+# itself. Order is the A/C's own arbitration: turbo wins, then quiet, then sleep.
+FAN_FORCING_PRESETS = {
+    PRESET_TURBO: "high",
+    PRESET_QUIET: "low",
+    PRESET_SLEEP: "low",
+}
 
 # --- Diagnostics: mfg-cluster attrs read RAW from python-matter-server (docs/14) ------
 # HA's native Matter integration does not render a custom cluster, but matter-server stores

@@ -18,5 +18,31 @@
     "abort": {
       "already_configured": "This A/C is already set up."
     }
+  },
+  "entity": {
+    "climate": {
+      "unified": {
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "eco_quiet": "Eco + Quiet",
+              "sleep_general": "Sleep: General",
+              "sleep_old": "Sleep: Old",
+              "sleep_young": "Sleep: Young",
+              "sleep_kids": "Sleep: Kids",
+              "eco_sleep_general": "Eco + Sleep: General",
+              "eco_sleep_old": "Eco + Sleep: Old",
+              "eco_sleep_young": "Eco + Sleep: Young",
+              "eco_sleep_kids": "Eco + Sleep: Kids"
+            }
+          }
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "fan_mode_forced_by_preset": {
+      "message": "Cannot set fan mode \"{fan_mode}\": the {preset} preset holds the fan at \"{forced}\". Turn the preset off first, then set the fan."
+    }
   }
 }
