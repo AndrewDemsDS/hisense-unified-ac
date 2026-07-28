@@ -77,13 +77,34 @@ def test_preset_icons_cover_exactly_the_possible_presets() -> None:
     )
 
 
-def test_sleep_select_icons_cover_every_profile() -> None:
+def test_the_sleep_select_has_an_icon() -> None:
+    # Only a default, no per-state map: this select's states are the raw ModeSelect option
+    # strings ("Off", "General", ...) and hassfest requires translation keys to be slugs,
+    # so per-option icons would need the options slugified first. See the slug test below.
     icons = _json("icons")
-    key = _translation_key("select.py")
-    block = icons["entity"]["select"][key]["state"]
-    assert set(block) == set(SLEEP_PROFILE_OPTIONS), (
-        f"sleep option icons drifted: {set(block) ^ set(SLEEP_PROFILE_OPTIONS)}"
+    block = icons["entity"]["select"][_translation_key("select.py")]
+    assert block.get("default", "").startswith("mdi:")
+    assert "state" not in block, (
+        "per-state icons here need slug keys; hassfest rejects the raw option strings"
     )
+
+
+def test_every_icons_translation_key_is_a_slug() -> None:
+    # hassfest's rule, enforced locally so it does not have to fail in CI:
+    # keys must match [a-z0-9-_]+ and not start or end with a hyphen or underscore.
+    # Entity ids and mdi values are not keys, so only walk the key positions.
+    slug = re.compile(r"[a-z0-9][a-z0-9_-]*[a-z0-9]|[a-z0-9]")
+
+    def walk(node, path: str) -> None:
+        if not isinstance(node, dict):
+            return
+        for key, value in node.items():
+            # "default" and the domain/entity-name levels are structural, but they are all
+            # slugs anyway, so validating every key costs nothing and catches more.
+            assert slug.fullmatch(key), f"invalid translation key {key!r} at {path}"
+            walk(value, f"{path}.{key}")
+
+    walk(_json("icons")["entity"], "entity")
 
 
 def test_every_icon_is_an_mdi_name() -> None:

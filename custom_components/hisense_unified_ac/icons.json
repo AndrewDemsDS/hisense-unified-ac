@@ -25,14 +25,7 @@
     },
     "select": {
       "sleep_profile": {
-        "default": "mdi:bed-clock",
-        "state": {
-          "Off": "mdi:sleep-off",
-          "General": "mdi:bed",
-          "Old": "mdi:human-cane",
-          "Young": "mdi:account",
-          "Kids": "mdi:baby-face-outline"
-        }
+        "default": "mdi:bed-clock"
       }
     },
     "sensor": {
