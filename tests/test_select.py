@@ -7,9 +7,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from stubs import SLEEP_OPTIONS, base_states, make_select, run, state  # noqa: E402
+from stubs import SLEEP_OPTIONS, base_states, make_select, run, state
 
-from hisense_unified_ac.const import SLEEP_PROFILE_OPTIONS  # noqa: E402
+from hisense_unified_ac.const import SLEEP_PROFILE_OPTIONS
 
 
 def test_mirrors_the_native_options_rather_than_hardcoding_them() -> None:

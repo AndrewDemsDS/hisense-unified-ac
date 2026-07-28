@@ -7,11 +7,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import _pkg  # noqa: E402
+import _pkg
 
 _pkg.install()
 
-from hisense_unified_ac.const import (  # noqa: E402
+from hisense_unified_ac.const import (
     COMBO_SETTLE_SECONDS,
     FAN_FORCING_PRESETS,
     PRESET_ECO,
@@ -19,7 +19,7 @@ from hisense_unified_ac.const import (  # noqa: E402
     PRESET_SLEEP,
     PRESET_TURBO,
 )
-from hisense_unified_ac.features import (  # noqa: E402
+from hisense_unified_ac.features import (
     HEAT_CAPABILITY,
     PRESET_CAPABILITY,
     PRESET_COMBOS,

@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from stubs import (  # noqa: E402
+from stubs import (
     COOL_ONLY_FEATURES1,
     base_states,
     make_climate,
@@ -16,10 +16,10 @@ from stubs import (  # noqa: E402
     state,
 )
 
-from homeassistant.components.climate import ClimateEntityFeature, HVACMode  # noqa: E402
-from homeassistant.exceptions import ServiceValidationError  # noqa: E402
+from homeassistant.components.climate import ClimateEntityFeature, HVACMode
+from homeassistant.exceptions import ServiceValidationError
 
-from hisense_unified_ac.const import COMBO_SETTLE_SECONDS  # noqa: E402
+from hisense_unified_ac.const import COMBO_SETTLE_SECONDS
 
 ALL_PRESETS = [
     "none",

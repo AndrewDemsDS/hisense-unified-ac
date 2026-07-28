@@ -27,7 +27,8 @@ def run_module(namespace: dict) -> int:
     for name, fn in tests:
         try:
             fn()
-        except BaseException as exc:  # noqa: BLE001 - a runner reports, it does not filter
+        # Broad on purpose: a runner reports every failure, it does not filter them.
+        except BaseException as exc:
             failed.append((name, exc))
             print(f"  FAIL {name}")
             traceback.print_exc()

@@ -1,0 +1,13 @@
+# Committed so `ruff check` locally and the CI gate use the SAME rule set. Without this the
+# repo inherits whatever config happens to be above it (this tree sits inside the firmware
+# repo, whose ruff.toml selects a narrower set) while CI, checking out this repo alone, gets
+# ruff's defaults. Same command, different rules, and the mismatch only shows up in CI.
+#
+# The gate targets real bugs, matching the firmware repo's philosophy: pyflakes `F`
+# (undefined names, unused imports and variables, bad f-strings) and `E9` (syntax/IO
+# errors), plus `RUF100` so a stale `# noqa` cannot rot unnoticed. Line-style rules are
+# deliberately left out; `ruff format` owns formatting.
+target-version = "py313"
+
+[lint]
+select = ["E9", "F", "RUF100"]

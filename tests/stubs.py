@@ -17,7 +17,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import _pkg  # noqa: E402
+import _pkg
 
 _pkg.install()
 

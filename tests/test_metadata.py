@@ -18,12 +18,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import _pkg  # noqa: E402
+import _pkg
 
 _pkg.install()
 COMPONENT = _pkg.COMPONENT
 
-from hisense_unified_ac.const import (  # noqa: E402
+from hisense_unified_ac.const import (
     PRESET_ECO,
     PRESET_NONE,
     PRESET_QUIET,
@@ -32,7 +32,7 @@ from hisense_unified_ac.const import (  # noqa: E402
     SLEEP_PRESET_PREFIX,
     SLEEP_PROFILE_OPTIONS,
 )
-from hisense_unified_ac.features import PRESET_COMBOS  # noqa: E402
+from hisense_unified_ac.features import PRESET_COMBOS
 
 
 COMPONENT_FILES = {
