@@ -136,6 +136,25 @@ it is not fixable here: the write succeeds, but the A/C keeps reporting its forc
 and the firmware's roughly 1 Hz status downlink writes that speed back over ours. The A/C's
 quiet fan step has no Matter FanMode of its own, so it reads back as `low` regardless.
 
+## Grouping several A/Cs
+
+Since 1.4.0 the unified climate entity uses exactly the same fan and preset names as the
+[hisense-w41h1 ESPHome build](https://github.com/AndrewDemsDS/hisense-w41h1/blob/main/docs/guide/ESPHome-Build.md):
+
+- Fan: `auto`, `low`, `medium_low`, `medium`, `medium_high`, `high`
+- Presets: `none`, `eco`, `quiet`, `turbo`, `eco_quiet`, `sleep_*`, `eco_sleep_*`
+
+So several A/Cs, on Matter or ESPHome, can be driven as one thermostat with
+[Climate Group Helper](https://github.com/bjrnptrsn/climate_group_helper) (HACS). Use its
+`intersection` feature strategy and mirror sync on `hvac_mode`, `temperature` and `fan_mode`.
+
+Add **this integration's** climate entity to the group, never the native Matter climate: the native one
+has no fan, swing or presets, and reports a wider setpoint range that confuses the group's limits.
+AmebaZ2 modules need firmware 1.3.38 or later for `medium_low` / `medium_high` to hold.
+
+Full walkthrough, validated settings and behaviour notes:
+[Climate Groups](https://github.com/AndrewDemsDS/hisense-w41h1/blob/main/docs/guide/Climate-Groups.md).
+
 ## Lovelace card
 
 The unified entity renders in the built-in **Thermostat** card. A HA integration
