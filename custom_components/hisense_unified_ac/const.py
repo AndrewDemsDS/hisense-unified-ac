@@ -19,7 +19,29 @@ PRESET_SLEEP = "sleep"
 
 # Named fan modes -> percentage on the underlying Matter fan (the path that
 # actually drives the A/C bus; auto uses the fan preset instead).
-FAN_PERCENT = {"low": 25, "medium": 58, "high": 100}
+# The firmware ladder (k_hisense_fan_table in matter_aircon_map.h) has five named steps above
+# quiet, and these are their PercentCurrent values. The names match the hisense-w41h1 ESPHome
+# build's fan modes, so a climate group sees the same vocabulary on either firmware.
+FAN_MODES = ["auto", "low", "medium_low", "medium", "medium_high", "high"]
+FAN_PERCENT = {"low": 25, "medium_low": 42, "medium": 58, "medium_high": 75, "high": 100}
+
+
+def fan_mode_from_percentage(pct: float) -> str:
+    """Name a non-auto fan percentage, using the firmware's own bands.
+
+    Mirrors percent_to_hisense_fan() in matter_aircon_map.h, so whatever percentage the
+    firmware reports lands on the step it is actually running. The quiet band (<= 16) reads
+    as low: quiet is a preset (the mute flag), not a fan mode, on both firmwares.
+    """
+    if pct <= 33:
+        return "low"
+    if pct <= 50:
+        return "medium_low"
+    if pct <= 67:
+        return "medium"
+    if pct <= 83:
+        return "medium_high"
+    return "high"
 
 # The sleep ModeSelect option that means "no sleep profile".
 SLEEP_OFF_OPTION = "Off"

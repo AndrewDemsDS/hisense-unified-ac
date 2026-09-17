@@ -19,7 +19,7 @@ from stubs import (
 from homeassistant.components.climate import ClimateEntityFeature, HVACMode
 from homeassistant.exceptions import ServiceValidationError
 
-from hisense_unified_ac.const import COMBO_SETTLE_SECONDS
+from hisense_unified_ac.const import COMBO_SETTLE_SECONDS, FAN_PERCENT
 
 ALL_PRESETS = [
     "none",
@@ -375,6 +375,32 @@ def test_named_fan_speeds_go_through_the_percentage_path() -> None:
     entity, recorder = make_climate()
     run(entity.async_set_fan_mode("medium"))
     assert recorder.calls == [("fan", "set_percentage", "fan.f", None)]
+
+
+def test_fan_modes_match_the_esphome_build() -> None:
+    # A climate group syncs only what its members agree on, so the Matter wrapper and the
+    # ESPHome build must spell the ladder identically.
+    entity, _ = make_climate()
+    assert entity.fan_modes == ["auto", "low", "medium_low", "medium", "medium_high", "high"]
+
+
+def test_every_fan_step_round_trips_through_the_percentage() -> None:
+    # What we write for a step must read back as that step, using the firmware's own bands.
+    for mode, pct in FAN_PERCENT.items():
+        entity, _ = make_climate(
+            base_states() | {"fan.f": state("on", preset_mode="medium", percentage=pct)}
+        )
+        assert entity.fan_mode == mode, (mode, pct)
+    # the quiet step (10 %) is the quiet preset, and reads as low
+    entity, _ = make_climate(
+        base_states() | {"fan.f": state("on", preset_mode="low", percentage=10)}
+    )
+    assert entity.fan_mode == "low"
+    # auto wins over its placeholder percentage
+    entity, _ = make_climate(
+        base_states() | {"fan.f": state("on", preset_mode="auto", percentage=50)}
+    )
+    assert entity.fan_mode == "auto"
 
 
 if __name__ == "__main__":

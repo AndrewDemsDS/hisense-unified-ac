@@ -43,6 +43,7 @@ from .const import (
     CONF_TURBO,
     DOMAIN,
     FAN_FORCING_PRESETS,
+    FAN_MODES,
     FAN_PERCENT,
     PRESET_ECO,
     PRESET_NONE,
@@ -52,6 +53,7 @@ from .const import (
     SLEEP_OFF_OPTION,
     SLEEP_PRESET_PREFIX,
     SLEEP_PROFILE_OPTIONS,
+    fan_mode_from_percentage,
 )
 from .coordinator import HisenseDiagCoordinator
 from .features import (
@@ -98,7 +100,7 @@ class UnifiedClimate(ClimateEntity):
     _attr_should_poll = False
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_translation_key = "unified"  # preset icons in icons.json
-    _attr_fan_modes = ["auto", "low", "medium", "high"]
+    _attr_fan_modes = FAN_MODES
     _attr_swing_modes = ["off", "vertical"]
     _attr_min_temp = 16
     _attr_max_temp = 32
@@ -344,7 +346,15 @@ class UnifiedClimate(ClimateEntity):
         s = self._state(self._fan)
         if not s or s.state in UNAVAILABLE_STATES:
             return None
-        return s.attributes.get("preset_mode")
+        preset = s.attributes.get("preset_mode")
+        if preset == "auto":
+            return preset
+        # Matter's FanMode only knows low/medium/high, so the two in-between steps are only
+        # visible in the percentage. Prefer it whenever the fan reports one.
+        pct = s.attributes.get("percentage")
+        if isinstance(pct, (int, float)) and pct > 0:
+            return fan_mode_from_percentage(pct)
+        return preset
 
     @property
     def swing_mode(self) -> str:
