@@ -381,7 +381,14 @@ def test_fan_modes_match_the_esphome_build() -> None:
     # A climate group syncs only what its members agree on, so the Matter wrapper and the
     # ESPHome build must spell the ladder identically.
     entity, _ = make_climate()
-    assert entity.fan_modes == ["auto", "low", "medium_low", "medium", "medium_high", "high"]
+    assert entity.fan_modes == [
+        "auto",
+        "low",
+        "medium_low",
+        "medium",
+        "medium_high",
+        "high",
+    ]
 
 
 def test_every_fan_step_round_trips_through_the_percentage() -> None:

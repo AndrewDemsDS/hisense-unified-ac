@@ -23,7 +23,13 @@ PRESET_SLEEP = "sleep"
 # quiet, and these are their PercentCurrent values. The names match the hisense-w41h1 ESPHome
 # build's fan modes, so a climate group sees the same vocabulary on either firmware.
 FAN_MODES = ["auto", "low", "medium_low", "medium", "medium_high", "high"]
-FAN_PERCENT = {"low": 25, "medium_low": 42, "medium": 58, "medium_high": 75, "high": 100}
+FAN_PERCENT = {
+    "low": 25,
+    "medium_low": 42,
+    "medium": 58,
+    "medium_high": 75,
+    "high": 100,
+}
 
 
 def fan_mode_from_percentage(pct: float) -> str:
@@ -42,6 +48,7 @@ def fan_mode_from_percentage(pct: float) -> str:
     if pct <= 83:
         return "medium_high"
     return "high"
+
 
 # The sleep ModeSelect option that means "no sleep profile".
 SLEEP_OFF_OPTION = "Off"
