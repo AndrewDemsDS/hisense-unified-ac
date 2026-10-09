@@ -19,6 +19,16 @@
               "eco_sleep_young": "mdi:leaf-circle",
               "eco_sleep_kids": "mdi:leaf-circle"
             }
+          },
+          "fan_mode": {
+            "state": {
+              "auto": "mdi:fan-auto",
+              "low": "mdi:fan-speed-1",
+              "medium_low": "mdi:fan-chevron-down",
+              "medium": "mdi:fan-speed-2",
+              "medium_high": "mdi:fan-chevron-up",
+              "high": "mdi:fan-speed-3"
+            }
           }
         }
       }
