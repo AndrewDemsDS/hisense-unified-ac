@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from stubs import (
+    ALL_HVAC,
     COOL_ONLY_FEATURES1,
     base_states,
     make_climate,
@@ -49,7 +50,7 @@ def test_a_fully_wired_unit_advertises_everything() -> None:
         HVACMode.OFF,
         HVACMode.COOL,
         HVACMode.HEAT,
-        HVACMode.HEAT_COOL,
+        HVACMode.AUTO,
         HVACMode.DRY,
         HVACMode.FAN_ONLY,
     ]
@@ -74,6 +75,19 @@ def test_hvac_modes_mirror_the_native_climate() -> None:
     )
     assert HVACMode.DRY not in entity.hvac_modes
     assert HVACMode.FAN_ONLY not in entity.hvac_modes
+
+
+def test_the_native_heat_cool_is_presented_as_auto() -> None:
+    # The Matter climate calls the unit's auto mode heat_cool. This entity offers and reports
+    # it as auto, and translates back when it commands the native entity.
+    entity, recorder = make_climate(
+        base_states() | {"climate.b": state("heat_cool", hvac_modes=ALL_HVAC)}
+    )
+    assert HVACMode.AUTO in entity.hvac_modes
+    assert HVACMode.HEAT_COOL not in entity.hvac_modes
+    assert entity.hvac_mode == HVACMode.AUTO
+    run(entity.async_set_hvac_mode(HVACMode.AUTO))
+    assert recorder.data[-1] == {"entity_id": "climate.b", "hvac_mode": "heat_cool"}
 
 
 def test_a_cooling_only_unit_loses_heat_and_its_gated_presets() -> None:
