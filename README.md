@@ -3,7 +3,8 @@
 A Home Assistant custom integration (HACS-compatible) that merges a de-clouded
 Hisense **AEH-W41H1** A/C's native Matter entities into **one climate entity**:
 
-- HVAC modes: off / cool / heat / auto / dry / fan-only
+- HVAC modes: off / cool / heat / auto / dry / fan-only. `auto` is the unit's own auto mode,
+  which Home Assistant's Matter integration calls `heat_cool`
 - Fan: auto / low / medium_low / medium / medium_high / high, the same names as the
   hisense-w41h1 ESPHome build (fixed speeds drive the percentage path)
 - Swing: off / vertical (Matter fan oscillation)

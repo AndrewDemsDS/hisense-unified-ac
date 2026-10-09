@@ -62,11 +62,14 @@ class Recorder:
 
     def __init__(self) -> None:
         self.calls: list[tuple[str, str, Any, Any]] = []
+        # The full service data of each call, for tests that check a field `calls` drops.
+        self.data: list[dict[str, Any]] = []
 
     async def async_call(
         self, domain: str, service: str, data: dict, blocking: bool = False
     ) -> None:
         self.calls.append((domain, service, data.get("entity_id"), data.get("option")))
+        self.data.append(dict(data))
 
 
 class _States:

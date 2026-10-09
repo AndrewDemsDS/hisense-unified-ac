@@ -76,12 +76,25 @@ ALL_HVAC_MODES = [
     HVACMode.OFF,
     HVACMode.COOL,
     HVACMode.HEAT,
-    HVACMode.HEAT_COOL,
+    HVACMode.AUTO,
     HVACMode.DRY,
     HVACMode.FAN_ONLY,
 ]
 # Modes that need a heat pump (capability cool_heat); a cooling-only unit gets neither.
-HEAT_PUMP_MODES = {HVACMode.HEAT, HVACMode.HEAT_COOL}
+HEAT_PUMP_MODES = {HVACMode.HEAT, HVACMode.AUTO}
+# The unit's own auto mode. Home Assistant's Matter integration reports the Thermostat's Auto
+# system mode as heat_cool, which the UI labels "Heat/Cool". The unit picks heating or cooling
+# by itself in that mode, so this entity presents it as auto, the same name the ESPHome build
+# uses. Everything read from or written to the native entity goes through these two helpers.
+NATIVE_AUTO = HVACMode.HEAT_COOL
+
+
+def _from_native(mode: str) -> str:
+    return HVACMode.AUTO if mode == NATIVE_AUTO else mode
+
+
+def _to_native(mode: str) -> str:
+    return NATIVE_AUTO if mode == HVACMode.AUTO else mode
 
 
 async def async_setup_entry(
@@ -196,7 +209,8 @@ class UnifiedClimate(ClimateEntity):
         """
         s = self._state(self._base)
         base_modes = s.attributes.get("hvac_modes") if s else None
-        if base_modes and (mirrored := [m for m in ALL_HVAC_MODES if m in base_modes]):
+        offered = {_from_native(m) for m in base_modes} if base_modes else set()
+        if mirrored := [m for m in ALL_HVAC_MODES if m in offered]:
             return mirrored
         caps = self._capabilities
         if supports(caps, HEAT_CAPABILITY):
@@ -308,7 +322,7 @@ class UnifiedClimate(ClimateEntity):
         if not s or s.state in UNAVAILABLE_STATES:
             return None
         try:
-            return HVACMode(s.state)
+            return HVACMode(_from_native(s.state))
         except ValueError:
             return None
 
@@ -420,7 +434,7 @@ class UnifiedClimate(ClimateEntity):
         await self.hass.services.async_call(
             "climate",
             "set_hvac_mode",
-            {"entity_id": self._base, "hvac_mode": hvac_mode},
+            {"entity_id": self._base, "hvac_mode": _to_native(hvac_mode)},
             blocking=True,
         )
 
