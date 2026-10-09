@@ -24,6 +24,7 @@ _pkg.install()
 COMPONENT = _pkg.COMPONENT
 
 from hisense_unified_ac.const import (
+    FAN_MODES,
     PRESET_ECO,
     PRESET_NONE,
     PRESET_QUIET,
@@ -75,6 +76,19 @@ def test_preset_icons_cover_exactly_the_possible_presets() -> None:
         f"preset icons drifted: missing {_every_preset_value() - set(block)}, "
         f"stale {set(block) - _every_preset_value()}"
     )
+
+
+def test_fan_mode_icons_cover_exactly_the_fan_ladder() -> None:
+    # medium_low and medium_high are not Home Assistant built-ins, so without an entry here
+    # those two steps render with no icon while the other four get the core defaults.
+    icons = _json("icons")
+    key = _translation_key("climate.py")
+    block = icons["entity"]["climate"][key]["state_attributes"]["fan_mode"]["state"]
+    assert set(block) == set(FAN_MODES), (
+        f"fan icons drifted: missing {set(FAN_MODES) - set(block)}, "
+        f"stale {set(block) - set(FAN_MODES)}"
+    )
+    assert all(v.startswith("mdi:") for v in block.values())
 
 
 def test_the_sleep_select_has_an_icon() -> None:
