@@ -9,6 +9,35 @@ CONF_ECO = "eco_switch"
 CONF_QUIET = "quiet_switch"
 CONF_TURBO = "turbo_switch"
 CONF_SLEEP = "sleep_select"
+# Siblings that are only re-exposed (never driven by the climate entity), so the unified
+# device page carries the same entities as the hisense-w41h1 ESPHome build.
+CONF_DISPLAY = "display_switch"
+CONF_BEEPER = "beeper_switch"
+CONF_OUTDOOR_TEMP = "outdoor_temperature_sensor"
+CONF_COIL_TEMP = "coil_temperature_sensor"
+CONF_POWER = "power_sensor"
+CONF_VOLTAGE = "voltage_sensor"
+CONF_CURRENT = "current_sensor"
+CONF_AUX_HEAT = "aux_heat_sensor"
+CONF_FAULT = "fault_sensor"
+# Every key that names a native Matter entity found by discovery.py. One list, so the
+# setup-time healing, the reload-on-new-entity check and the tests cannot disagree.
+SIBLING_KEYS = (
+    CONF_FAN,
+    CONF_ECO,
+    CONF_QUIET,
+    CONF_TURBO,
+    CONF_SLEEP,
+    CONF_DISPLAY,
+    CONF_BEEPER,
+    CONF_OUTDOOR_TEMP,
+    CONF_COIL_TEMP,
+    CONF_POWER,
+    CONF_VOLTAGE,
+    CONF_CURRENT,
+    CONF_AUX_HEAT,
+    CONF_FAULT,
+)
 
 # Preset names surfaced on the unified climate entity.
 PRESET_NONE = "none"
@@ -98,50 +127,143 @@ ATTR_COMPRESSOR_HZ = 16  # 0x0010 int8u, Hz
 ATTR_FEATURES1 = 18  # 0x0012 int32u, packed HisenseFeatures
 ATTR_FAULTS1 = 19  # 0x0013 int32u, packed HisenseFaults
 
+# ======================================================================================
+# PROVISIONAL ATTRIBUTE IDS. The firmware side of these four bus counters is not merged,
+# so the ids below are placeholders (the next free ids after Faults1). This table is the
+# only place they live: change the number here when the firmware fixes them and nothing
+# else needs to move.
+#
+# A wrong or unassigned id is harmless. A counter entity is created only when its path
+# "1/<MFG_CLUSTER>/<id>" is present in the node's attribute data as matter-server reports
+# it, so on firmware without the attribute there is no entity at all, and one appears by
+# itself (no reload) once an updated node starts reporting it.
+#
+# key -> (attribute id, entity name, mdi icon). Names and icons are the ESPHome build's
+# (firmware/esphome/w41h1.yaml and components/hisense_ac/sensor.py).
+# ======================================================================================
+BUS_COUNTER_ATTRS: dict[str, tuple[int, str, str]] = {
+    "checksum_errors": (0x0014, "Bus checksum errors", "mdi:alert-circle-outline"),
+    "reply_timeouts": (0x0015, "Bus reply timeouts", "mdi:timer-alert-outline"),
+    "unanswered_commands": (0x0016, "Unanswered commands", "mdi:message-alert-outline"),
+    "link_losses": (0x0017, "Bus link losses", "mdi:lan-disconnect"),
+}
+
 # Bit contract. MUST match HISENSE_FAULT1_* / HISENSE_FEAT1_* in
 # firmware/src/rs485-driver/hisense_rs485.h; a host test in the firmware repo
 # (firmware/test/test_diag_contract.py) asserts these agree, so do not edit one side alone.
 FAULTS1_VALID_BIT = 31
 FAULTS1_ANY_BIT = 30
-# (bit, key, friendly name) for the 18 named f_e_* fault bits, struct order.
+# (bit, key, entity name) for the 18 named f_e_* fault bits, struct order. The names are the
+# ESPHome component's defaults (FAULT_BITS in firmware/esphome/components/hisense_ac/
+# binary_sensor.py), so a fault reads the same on either firmware.
 FAULT1_BITS: list[tuple[int, str, str]] = [
-    (0, "in_temp", "Indoor temp sensor"),
-    (1, "in_coil_temp", "Indoor coil sensor"),
-    (2, "in_humidity", "Indoor humidity sensor"),
-    (3, "water_full", "Condensate tray full"),
-    (4, "in_fan_motor", "Indoor fan motor"),
-    (5, "grille", "Grille / up-down machine"),
-    (6, "in_vzero", "Zero-cross detect"),
-    (7, "in_com", "Indoor-outdoor comms"),
-    (8, "in_display", "Indoor display"),
-    (9, "in_keys", "Indoor keypad"),
-    (10, "in_wifi", "Indoor Wi-Fi module"),
-    (11, "in_ele", "Indoor electrical"),
-    (12, "in_eeprom", "Indoor EEPROM"),
-    (13, "out_eeprom", "Outdoor EEPROM"),
-    (14, "out_coil_temp", "Outdoor coil sensor"),
-    (15, "out_gas_temp", "Outdoor gas sensor"),
-    (16, "out_temp", "Outdoor temp sensor"),
-    (17, "over_temp", "Over-temp protection"),
+    (0, "in_temp", "Fault indoor temp sensor"),
+    (1, "in_coil_temp", "Fault indoor coil sensor"),
+    (2, "in_humidity", "Fault indoor humidity sensor"),
+    (3, "water_full", "Fault condensate tray full"),
+    (4, "in_fan_motor", "Fault indoor fan motor"),
+    (5, "grille", "Fault grille"),
+    (6, "in_vzero", "Fault zero-cross detect"),
+    (7, "in_com", "Fault indoor to outdoor comms"),
+    (8, "in_display", "Fault indoor display"),
+    (9, "in_keys", "Fault indoor keypad"),
+    (10, "in_wifi", "Fault indoor wifi module"),
+    (11, "in_ele", "Fault indoor electrical"),
+    (12, "in_eeprom", "Fault indoor EEPROM"),
+    (13, "out_eeprom", "Fault outdoor EEPROM"),
+    (14, "out_coil_temp", "Fault outdoor coil sensor"),
+    (15, "out_gas_temp", "Fault outdoor gas sensor"),
+    (16, "out_temp", "Fault outdoor temp sensor"),
+    (17, "over_temp", "Fault over temperature"),
 ]
 
 FEATURES1_VALID_BIT = 31
 FEATURES1_EXT_VALID_BIT = 30
 FEATURES1_POWER_DISPLAY_SHIFT = 16  # 2-bit
 FEATURES1_DEMAND_RESP_SHIFT = 18  # 2-bit
-# (bit, key, friendly name, is_ext_tier) for the single-bit capability flags.
+# (bit, key, entity name, is_ext_tier) for the single-bit capability flags. Names are the
+# ESPHome component's defaults (CAPABILITY_BITS in the same file).
 FEAT1_BITS: list[tuple[int, str, str, bool]] = [
-    (0, "cool_heat", "Heat-pump (cool+heat)", False),
-    (1, "ai", "AI / smart mode", False),
-    (2, "infinite_fan", "Infinite fan speed", False),
-    (3, "power_save", "Eco / power save", False),
-    (4, "fan_mute", "Quiet / fan mute", False),
-    (5, "swing_dir_8", "8-position louvre", False),
-    (6, "swing_follow", "Swing follow", False),
-    (7, "humidity", "Humidity sensing", False),
-    (8, "heat_8c", "8 C frost-guard heat", False),
-    (9, "purify", "Ionizer / purify", False),
-    (10, "q_display", "Quiet display", True),
-    (11, "enable_8heat", "8 C heat enable", True),
-    (12, "trans_102_64", "Stock profile 199", True),
+    (0, "cool_heat", "Capability heat pump", False),
+    (1, "ai", "Capability AI mode", False),
+    (2, "infinite_fan", "Capability infinite fan", False),
+    (3, "power_save", "Capability eco", False),
+    (4, "fan_mute", "Capability quiet", False),
+    (5, "swing_dir_8", "Capability 8-position louvre", False),
+    (6, "swing_follow", "Capability swing follow", False),
+    (7, "humidity", "Capability humidity", False),
+    (8, "heat_8c", "Capability 8C frost guard", False),
+    (9, "purify", "Capability purify", False),
+    (10, "q_display", "Capability display control", True),
+    (11, "enable_8heat", "Capability enable 8C heat", True),
+    (12, "trans_102_64", "Capability trans 102-64", True),
 ]
+
+# Which per-bit entities are enabled on a fresh install: the ones the ESPHome build's
+# w41h1.yaml declares. The rest exist but start disabled, so the device page has the same
+# rows on either firmware and the long tail is one click away. Enabled state is stored in
+# the entity registry, so this never changes an entity that already exists.
+FAULTS_ENABLED_BY_DEFAULT = frozenset({"in_temp", "in_com", "water_full", "out_temp"})
+CAPABILITIES_ENABLED_BY_DEFAULT = frozenset({"cool_heat", "power_save", "fan_mute"})
+
+# Icon per capability flag (a capability has no device class, so without one every flag
+# shows the generic binary-sensor icon). Same icons as the ESPHome component.
+CAPABILITY_ICONS: dict[str, str] = {
+    "cool_heat": "mdi:heat-pump",
+    "ai": "mdi:brain",
+    "infinite_fan": "mdi:fan",
+    "power_save": "mdi:leaf",
+    "fan_mute": "mdi:volume-off",
+    "swing_dir_8": "mdi:arrow-up-down",
+    "swing_follow": "mdi:arrow-oscillating",
+    "humidity": "mdi:water-percent",
+    "heat_8c": "mdi:snowflake-thermometer",
+    "purify": "mdi:air-purifier",
+    "q_display": "mdi:television-ambient-light",
+    "enable_8heat": "mdi:snowflake-thermometer",
+    "trans_102_64": "mdi:swap-horizontal",
+}
+
+# --- Re-exposed switches: config key -> (unique-id slug, entity name, mdi icon) --------
+# Names and icons are the ESPHome build's (w41h1.yaml, components/hisense_ac/switch.py).
+# Each one proxies the native Matter OnOff endpoint that discovery.py found; a switch
+# whose endpoint this firmware does not have is not created.
+SWITCHES: dict[str, tuple[str, str, str]] = {
+    CONF_ECO: ("eco", "Eco", "mdi:leaf"),
+    CONF_TURBO: ("turbo", "Turbo", "mdi:fan-plus"),
+    CONF_QUIET: ("quiet", "Quiet", "mdi:volume-off"),
+    CONF_DISPLAY: ("display", "Panel display", "mdi:television-ambient-light"),
+    CONF_BEEPER: ("beeper", "Beeper", "mdi:volume-high"),
+}
+
+# --- Sibling discovery rules (siblings.py) ---------------------------------------------
+# A native Matter entity is recognised two ways, in this order:
+#   1. by the endpoint label in its name. The firmware gives every endpoint a UserLabel
+#      "ha_entitylabel", which Home Assistant appends to the entity name for test-vendor
+#      devices ("Switch (Eco)", "Temperature (Coil)").
+#   2. by where it lives on the node, read out of the Matter unique id
+#      ("...-<endpoint>-<key>-<cluster>-<attribute>"). This is what still works on a Home
+#      Assistant that ignores the label and names the entity "Switch (3)".
+# key -> (domain, label words, (cluster, attribute), fallback endpoint or None).
+# A None endpoint with label words means the label is the only way in (the beeper: its
+# endpoint number is not part of the contract). A None endpoint with no label words means
+# the cluster and attribute are unique on the node, so any endpoint matches.
+CLUSTER_ONOFF = 6
+CLUSTER_BOOLEAN_STATE = 69  # 0x0045
+CLUSTER_MODE_SELECT = 80  # 0x0050
+CLUSTER_ELECTRICAL_POWER = 144  # 0x0090
+CLUSTER_TEMPERATURE = 1026  # 0x0402
+SIBLING_RULES: dict[str, tuple[str, tuple[str, ...], tuple[int, int], int | None]] = {
+    CONF_ECO: ("switch", ("eco",), (CLUSTER_ONOFF, 0), 3),
+    CONF_QUIET: ("switch", ("quiet", "mute"), (CLUSTER_ONOFF, 0), 4),
+    CONF_TURBO: ("switch", ("turbo",), (CLUSTER_ONOFF, 0), 5),
+    CONF_DISPLAY: ("switch", ("display",), (CLUSTER_ONOFF, 0), 9),
+    CONF_BEEPER: ("switch", ("beeper", "buzzer"), (CLUSTER_ONOFF, 0), None),
+    CONF_OUTDOOR_TEMP: ("sensor", ("outdoor",), (CLUSTER_TEMPERATURE, 0), 2),
+    CONF_COIL_TEMP: ("sensor", ("coil",), (CLUSTER_TEMPERATURE, 0), 8),
+    CONF_VOLTAGE: ("sensor", (), (CLUSTER_ELECTRICAL_POWER, 4), None),
+    CONF_CURRENT: ("sensor", (), (CLUSTER_ELECTRICAL_POWER, 5), None),
+    CONF_POWER: ("sensor", (), (CLUSTER_ELECTRICAL_POWER, 8), None),
+    CONF_AUX_HEAT: ("binary_sensor", ("aux",), (CLUSTER_BOOLEAN_STATE, 0), 7),
+    CONF_FAULT: ("binary_sensor", ("fault",), (CLUSTER_BOOLEAN_STATE, 0), 10),
+}

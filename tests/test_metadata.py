@@ -24,7 +24,13 @@ _pkg.install()
 COMPONENT = _pkg.COMPONENT
 
 from hisense_unified_ac.const import (
+    BUS_COUNTER_ATTRS,
+    CAPABILITIES_ENABLED_BY_DEFAULT,
+    CAPABILITY_ICONS,
     FAN_MODES,
+    FAULT1_BITS,
+    FAULTS_ENABLED_BY_DEFAULT,
+    FEAT1_BITS,
     PRESET_ECO,
     PRESET_NONE,
     PRESET_QUIET,
@@ -32,8 +38,75 @@ from hisense_unified_ac.const import (
     SLEEP_OFF_OPTION,
     SLEEP_PRESET_PREFIX,
     SLEEP_PROFILE_OPTIONS,
+    SWITCHES,
 )
 from hisense_unified_ac.features import PRESET_COMBOS
+
+# --- What the hisense-w41h1 ESPHome build shows, copied from its sources -----------------
+# firmware/esphome/w41h1.yaml (entity names) and firmware/esphome/components/hisense_ac/
+# {switch,sensor,select,binary_sensor}.py (icons, and the default names of the per-bit
+# entities). This is the reference the integration is aligned to, written out here on
+# purpose: the two live in different repos, so a rename on this side has to fail a test.
+ESPHOME_SWITCHES = {
+    "Eco": "mdi:leaf",
+    "Turbo": "mdi:fan-plus",
+    "Quiet": "mdi:volume-off",
+    "Panel display": "mdi:television-ambient-light",
+    "Beeper": "mdi:volume-high",
+}
+ESPHOME_COUNTERS = {
+    "Bus checksum errors": "mdi:alert-circle-outline",
+    "Bus reply timeouts": "mdi:timer-alert-outline",
+    "Unanswered commands": "mdi:message-alert-outline",
+    "Bus link losses": "mdi:lan-disconnect",
+}
+ESPHOME_FAULTS = [
+    "Fault indoor temp sensor",
+    "Fault indoor coil sensor",
+    "Fault indoor humidity sensor",
+    "Fault condensate tray full",
+    "Fault indoor fan motor",
+    "Fault grille",
+    "Fault zero-cross detect",
+    "Fault indoor to outdoor comms",
+    "Fault indoor display",
+    "Fault indoor keypad",
+    "Fault indoor wifi module",
+    "Fault indoor electrical",
+    "Fault indoor EEPROM",
+    "Fault outdoor EEPROM",
+    "Fault outdoor coil sensor",
+    "Fault outdoor gas sensor",
+    "Fault outdoor temp sensor",
+    "Fault over temperature",
+]
+ESPHOME_CAPABILITIES = {
+    "Capability heat pump": "mdi:heat-pump",
+    "Capability AI mode": "mdi:brain",
+    "Capability infinite fan": "mdi:fan",
+    "Capability eco": "mdi:leaf",
+    "Capability quiet": "mdi:volume-off",
+    "Capability 8-position louvre": "mdi:arrow-up-down",
+    "Capability swing follow": "mdi:arrow-oscillating",
+    "Capability humidity": "mdi:water-percent",
+    "Capability 8C frost guard": "mdi:snowflake-thermometer",
+    "Capability purify": "mdi:air-purifier",
+    "Capability display control": "mdi:television-ambient-light",
+    "Capability enable 8C heat": "mdi:snowflake-thermometer",
+    "Capability trans 102-64": "mdi:swap-horizontal",
+}
+# The per-bit entities w41h1.yaml declares, so the ones that start enabled here.
+ESPHOME_YAML_FAULTS = {
+    "Fault indoor temp sensor",
+    "Fault indoor to outdoor comms",
+    "Fault condensate tray full",
+    "Fault outdoor temp sensor",
+}
+ESPHOME_YAML_CAPABILITIES = {
+    "Capability heat pump",
+    "Capability eco",
+    "Capability quiet",
+}
 
 
 COMPONENT_FILES = {
@@ -177,6 +250,111 @@ def test_raised_exception_keys_exist_with_matching_placeholders() -> None:
         assert block, f"could not find placeholders passed for {key}"
         passed = set(re.findall(r'"(\w+)":', block.group(1)))
         assert used == passed, f"{key}: message uses {used}, code passes {passed}"
+
+
+def test_switches_carry_the_esphome_names_and_icons() -> None:
+    assert {name: icon for _slug, name, icon in SWITCHES.values()} == ESPHOME_SWITCHES
+    block = _json("icons")["entity"]["switch"]
+    assert {slug: block[slug]["default"] for slug in block} == {
+        slug: icon for slug, _name, icon in SWITCHES.values()
+    }, "icons.json switch block drifted from SWITCHES"
+
+
+def test_bus_counters_carry_the_esphome_names_and_icons() -> None:
+    assert {
+        name: icon for _attr, name, icon in BUS_COUNTER_ATTRS.values()
+    } == ESPHOME_COUNTERS
+    block = _json("icons")["entity"]["sensor"]
+    for key, (_attr, _name, icon) in BUS_COUNTER_ATTRS.items():
+        assert block[key]["default"] == icon, f"icons.json sensor.{key} drifted"
+    assert block["compressor_frequency"]["default"] == "mdi:sine-wave"
+    assert set(block) == set(BUS_COUNTER_ATTRS) | {
+        "compressor_frequency",
+        "capabilities",
+    }
+
+
+def test_fault_bits_carry_the_esphome_names_in_bit_order() -> None:
+    assert [name for _bit, _key, name in FAULT1_BITS] == ESPHOME_FAULTS
+    assert [bit for bit, _key, _name in FAULT1_BITS] == list(range(18))
+    enabled = {
+        name for _b, key, name in FAULT1_BITS if key in FAULTS_ENABLED_BY_DEFAULT
+    }
+    assert enabled == ESPHOME_YAML_FAULTS
+    assert FAULTS_ENABLED_BY_DEFAULT <= {key for _b, key, _n in FAULT1_BITS}
+
+
+def test_capability_flags_carry_the_esphome_names_and_icons() -> None:
+    assert {
+        name: CAPABILITY_ICONS[key] for _bit, key, name, _ext in FEAT1_BITS
+    } == ESPHOME_CAPABILITIES
+    block = _json("icons")["entity"]["binary_sensor"]
+    # Exactly the capability flags: the fault and link sensors take their icon from
+    # their device class, as the ESPHome ones do, so a leftover entry here is drift.
+    assert {key: value["default"] for key, value in block.items()} == {
+        f"capability_{key}": icon for key, icon in CAPABILITY_ICONS.items()
+    }
+    enabled = {
+        name
+        for _b, key, name, _x in FEAT1_BITS
+        if key in CAPABILITIES_ENABLED_BY_DEFAULT
+    }
+    assert enabled == ESPHOME_YAML_CAPABILITIES
+
+
+def test_the_sleep_select_uses_the_esphome_icon() -> None:
+    icons = _json("icons")
+    assert icons["entity"]["select"][_translation_key("select.py")] == {
+        "default": "mdi:sleep"
+    }
+
+
+def test_every_flow_field_has_a_label() -> None:
+    # A field with no entry under "data" renders as its raw key ("matter_url"). The
+    # options flow shipped with no strings at all before 1.6.0, which is how that looks.
+    source = _source("config_flow.py")
+    block = re.search(r"OVERRIDABLE = \((.*?)\)", source, re.S)
+    assert block, "OVERRIDABLE not found in config_flow.py"
+    const = {
+        name: value
+        for name, value in vars(sys.modules["hisense_unified_ac.const"]).items()
+        if name.startswith("CONF_")
+    }
+    overridable = {const[name] for name in re.findall(r"CONF_\w+", block.group(1))}
+    assert len(overridable) == 7
+    diagnostics = {const["CONF_MATTER_URL"], const["CONF_NODE_ID"]}
+    wanted = {
+        ("config", "user"): overridable
+        | diagnostics
+        | {const["CONF_BASE_CLIMATE"], const["CONF_NAME"]},
+        ("options", "init"): overridable | diagnostics,
+    }
+    for name in ("strings", "en"):
+        doc = _json(name)
+        for (section, step), fields in wanted.items():
+            form = doc[section]["step"][step]
+            assert set(form["data"]) == fields, (
+                f"{name}.json {section}.{step}: unlabelled {fields - set(form['data'])}, "
+                f"stale {set(form['data']) - fields}"
+            )
+            assert set(form.get("data_description", {})) <= fields
+
+
+def test_every_platform_file_is_loaded_and_every_loaded_platform_exists() -> None:
+    # A platform module that __init__ never forwards to is dead code that looks alive:
+    # the switches would never appear, with nothing in the log.
+    listed = set(re.findall(r"Platform\.([A-Z_]+)", _source("__init__.py")))
+    platforms = {"climate", "switch", "select", "sensor", "binary_sensor"}
+    assert listed == {p.upper() for p in platforms}
+    for platform in platforms:
+        assert (COMPONENT / f"{platform}.py").exists(), f"{platform}.py missing"
+        assert "async def async_setup_entry" in _source(f"{platform}.py")
+
+
+def test_manifest_loads_after_the_matter_integration() -> None:
+    # The native entities this wraps come from Matter; setting up after it means their
+    # states exist on the first write instead of every proxy starting unavailable.
+    assert "matter" in _json("manifest").get("after_dependencies", [])
 
 
 def test_manifest_version_is_semver() -> None:

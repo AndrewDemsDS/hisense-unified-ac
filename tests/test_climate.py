@@ -424,6 +424,17 @@ def test_every_fan_step_round_trips_through_the_percentage() -> None:
     assert entity.fan_mode == "auto"
 
 
+def test_is_the_devices_main_entity_and_keeps_its_unique_id() -> None:
+    # No name of its own, so it shows under the device's name, like the ESPHome build's
+    # climate (`name: None`). The unique id is what earlier releases registered.
+    entity, _ = make_climate()
+    assert entity.has_entity_name
+    assert entity.name is None
+    assert entity.unique_id == "e1_unified"
+    assert entity.device_info["name"] == "AC"
+    assert entity.device_info["identifiers"] == {("hisense_unified_ac", "e1")}
+
+
 if __name__ == "__main__":
     from _runner import run_module
 

@@ -28,7 +28,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import ServiceValidationError
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_state_change_event
 
@@ -37,7 +36,6 @@ from .const import (
     CONF_BASE_CLIMATE,
     CONF_ECO,
     CONF_FAN,
-    CONF_NAME,
     CONF_QUIET,
     CONF_SLEEP,
     CONF_TURBO,
@@ -56,6 +54,7 @@ from .const import (
     fan_mode_from_percentage,
 )
 from .coordinator import HisenseDiagCoordinator
+from .entity import UNAVAILABLE_STATES, device_info
 from .features import (
     HEAT_CAPABILITY,
     PRESET_CAPABILITY,
@@ -67,7 +66,6 @@ from .features import (
 
 _LOGGER = logging.getLogger(__name__)
 
-UNAVAILABLE_STATES = {"unavailable", "unknown", None}
 # Modes where a target temperature is meaningful (setpoint gated to these).
 SETPOINT_MODES = {HVACMode.COOL, HVACMode.HEAT}
 # Every mode this wrapper can drive, in the order they should appear in the UI. The
@@ -111,6 +109,10 @@ class UnifiedClimate(ClimateEntity):
     """A single climate entity wrapping the W41H1's native Matter entities."""
 
     _attr_should_poll = False
+    # The device's main entity: it takes the device's name, with nothing appended, the
+    # way the ESPHome build's climate does (`name: None` in its YAML).
+    _attr_has_entity_name = True
+    _attr_name = None
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_translation_key = "unified"  # preset icons in icons.json
     _attr_fan_modes = FAN_MODES
@@ -135,13 +137,8 @@ class UnifiedClimate(ClimateEntity):
         self._quiet: str | None = d.get(CONF_QUIET)
         self._turbo: str | None = d.get(CONF_TURBO)
         self._sleep: str | None = d.get(CONF_SLEEP)
-        self._attr_name = d.get(CONF_NAME) or "Unified AC"
         self._attr_unique_id = f"{entry.entry_id}_unified"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=self._attr_name,
-            manufacturer="Hisense (de-clouded W41H1)",
-        )
+        self._attr_device_info = device_info(entry)
 
     # ------------------------------------------------------------------ helpers
     @property

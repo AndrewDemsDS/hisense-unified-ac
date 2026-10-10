@@ -6,11 +6,16 @@ Three tiers, cheapest first, because the expensive one needs a real A/C.
 
 ## 1. Pure logic and metadata (no dependencies)
 
-`test_features.py` and `test_metadata.py` run under a bare `python3` with nothing
-installed. They cover capability decoding and gating, and they catch metadata drift:
-icons or labels for a preset that can no longer occur, a preset with no icon, an exception
-message whose placeholders no longer match what the code passes, `strings.json` and
-`translations/en.json` disagreeing.
+`test_features.py`, `test_siblings.py` and `test_metadata.py` run under a bare `python3`
+with nothing installed. They cover capability decoding and gating, the rules that match a
+native Matter entity to its role (by endpoint label, then by endpoint number), and they
+catch metadata drift: icons or labels for a preset that can no longer occur, a preset with
+no icon, an exception message whose placeholders no longer match what the code passes,
+`strings.json` and `translations/en.json` disagreeing, a flow field with no label.
+
+`test_metadata.py` also holds a copy of the ESPHome build's entity names and icons. The
+integration is meant to look the same as that build, and the two live in different repos,
+so a rename on either side has to be made in that table too.
 
 They also encode hardware measurements as assertions, so a later "tidy-up" cannot quietly
 undo them: `COMBO_SETTLE_SECONDS` must stay at or above 8 (at 6 the A/C swallowed the
@@ -19,10 +24,18 @@ the fan. Both of those were real bugs.
 
 ## 2. Entity behaviour (needs `homeassistant`)
 
-`test_climate.py` and `test_select.py` drive the entities against stub state: what they
-advertise, what they report, and the exact service calls and settle gaps they emit. No
+`test_climate.py`, `test_select.py`, `test_switch.py`, `test_sensor.py`,
+`test_binary_sensor.py` and `test_discovery.py` drive the entities against stub state: what
+they advertise, what they report, the exact service calls and settle gaps they emit, and
+which entities are created for a node that lacks an endpoint or an attribute. No
 `pytest-homeassistant-custom-component`, no real `hass`, because these entities only ever
-touch `hass.states.get()` and `hass.services.async_call()` (see `stubs.py`).
+touch `hass.states.get()` and `hass.services.async_call()` (see `stubs.py`). Discovery
+and the stale-entity cleanup also read the entity registry, which `stubs.py` fakes with
+`FakeRegistry`.
+
+Not covered by either tier: the config and options flows, and the setup path through a
+real Home Assistant core (device registry, platform forwarding, the reload when a native
+entity appears). Those need a `hass` fixture.
 
 `run_tests.sh` skips this tier with a warning when `homeassistant` is not importable, so
 the dev box still gets tier 1. To run it against the exact HA version the units talk to:

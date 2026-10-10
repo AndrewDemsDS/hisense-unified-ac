@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Hisense W41H1 Unified AC",
-        "description": "Pick the de-clouded A/C's native Matter climate entity. The fan, eco/quiet/turbo switches and sleep select are auto-detected from the same device; override any below if needed.",
+        "description": "Pick the de-clouded A/C's native Matter climate entity. The fan, switches, sleep select and sensors are auto-detected from the same device; override any below if needed.",
         "data": {
           "base_climate": "Native Matter climate entity",
           "name": "Name",
@@ -11,12 +11,43 @@
           "eco_switch": "Eco switch (optional override)",
           "quiet_switch": "Quiet switch (optional override)",
           "turbo_switch": "Turbo switch (optional override)",
-          "sleep_select": "Sleep select (optional override)"
+          "sleep_select": "Sleep select (optional override)",
+          "display_switch": "Panel display switch (optional override)",
+          "beeper_switch": "Beeper switch (optional override)",
+          "matter_url": "Matter server WebSocket URL",
+          "node_id": "Matter node id"
+        },
+        "data_description": {
+          "matter_url": "Needed for the diagnostics entities (compressor frequency, faults, capabilities, bus counters). Prefilled with the URL Home Assistant's Matter integration uses. Clear it to leave diagnostics off.",
+          "node_id": "Leave empty to use the node id read from the climate entity."
         }
       }
     },
     "abort": {
       "already_configured": "This A/C is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Diagnostics and overrides",
+        "description": "The Matter server URL and node id turn on the diagnostics entities. The entity overrides are only for something auto-detection missed; leave them empty otherwise.",
+        "data": {
+          "matter_url": "Matter server WebSocket URL",
+          "node_id": "Matter node id",
+          "fan": "Fan entity (optional override)",
+          "eco_switch": "Eco switch (optional override)",
+          "quiet_switch": "Quiet switch (optional override)",
+          "turbo_switch": "Turbo switch (optional override)",
+          "sleep_select": "Sleep select (optional override)",
+          "display_switch": "Panel display switch (optional override)",
+          "beeper_switch": "Beeper switch (optional override)"
+        },
+        "data_description": {
+          "matter_url": "Needed for the diagnostics entities (compressor frequency, faults, capabilities, bus counters). Prefilled with the URL Home Assistant's Matter integration uses. Clear it to leave diagnostics off.",
+          "node_id": "Leave empty to use the node id read from the climate entity."
+        }
+      }
     }
   },
   "entity": {
