@@ -26,11 +26,16 @@ from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import EntityCategory
 
 from hisense_unified_ac import sensor
-from hisense_unified_ac.const import BUS_COUNTER_ATTRS, MFG_CLUSTER
+from hisense_unified_ac.const import (
+    BUS_COUNTER_ATTRS,
+    MFG_CLUSTER,
+    OPTIONAL_ATTRS,
+    format_link_token,
+)
 from hisense_unified_ac.coordinator import (
     HisenseDiagCoordinator,
     attribute_path,
-    counters_from_node,
+    optional_from_node,
 )
 from hisense_unified_ac.sensor import MirrorSensor
 
@@ -177,39 +182,111 @@ def node_with(**counters: object) -> dict:
         "node_id": 1,
         "attributes": {
             f"1/{MFG_CLUSTER}/16": 40,
-            **{attribute_path(BUS_COUNTER_ATTRS[k][0]): v for k, v in counters.items()},
+            **{attribute_path(OPTIONAL_ATTRS[k]): v for k, v in counters.items()},
         },
     }
 
 
 def test_only_counters_present_in_the_node_data_are_reported() -> None:
-    assert counters_from_node(node_with()) == {}
-    assert counters_from_node(node_with(link_losses=2)) == {"link_losses": 2}
+    assert optional_from_node(node_with()) == {}
+    assert optional_from_node(node_with(link_losses=2)) == {"link_losses": 2}
     assert set(
-        counters_from_node(node_with(**{k: 0 for k in BUS_COUNTER_ATTRS}))
+        optional_from_node(node_with(**{k: 0 for k in BUS_COUNTER_ATTRS}))
     ) == set(BUS_COUNTER_ATTRS)
 
 
 def test_a_present_but_unfilled_counter_exists_with_no_value() -> None:
     # Null (not yet reported) and junk both mean "the attribute is there, value unknown".
-    assert counters_from_node(node_with(reply_timeouts=None)) == {
+    assert optional_from_node(node_with(reply_timeouts=None)) == {
         "reply_timeouts": None
     }
-    assert counters_from_node(node_with(reply_timeouts="x")) == {"reply_timeouts": None}
-    assert counters_from_node(node_with(reply_timeouts=True)) == {
+    assert optional_from_node(node_with(reply_timeouts="x")) == {"reply_timeouts": None}
+    assert optional_from_node(node_with(reply_timeouts=True)) == {
         "reply_timeouts": None
     }
+
+
+def test_link_token_and_bus_link_are_read_from_the_same_snapshot() -> None:
+    found = optional_from_node(node_with(link_token=0x0102, bus_link=True))
+    assert found == {"link_token": 0x0102, "bus_link": True}
+    assert optional_from_node(node_with(bus_link=False)) == {"bus_link": False}
+    # The flag is a boolean on the wire; a number there is not a link state.
+    assert optional_from_node(node_with(bus_link=1)) == {"bus_link": None}
+    assert optional_from_node(node_with(link_token=True)) == {"link_token": None}
 
 
 def test_a_malformed_node_reply_reports_no_counters() -> None:
     for junk in (None, [], "node", {}, {"attributes": None}, {"attributes": []}):
-        assert counters_from_node(junk) == {}
+        assert optional_from_node(junk) == {}
 
 
 def test_counter_ids_do_not_collide_with_each_other_or_the_fixed_attributes() -> None:
-    ids = [attr for attr, _name, _icon in BUS_COUNTER_ATTRS.values()]
+    ids = list(OPTIONAL_ATTRS.values())
     assert len(ids) == len(set(ids))
     assert not set(ids) & {0, 1, 2, 3, 16, 17, 18, 19}
+
+
+def test_optional_attribute_ids_are_the_firmware_contract() -> None:
+    # Fixed by the firmware (cluster 0xFFF1FC00, endpoint 1). A change here without the
+    # same change in the firmware reads the wrong attribute and raises nothing.
+    assert OPTIONAL_ATTRS == {
+        "checksum_errors": 0x0014,
+        "reply_timeouts": 0x0015,
+        "unanswered_commands": 0x0016,
+        "link_losses": 0x0017,
+        "link_token": 0x0018,
+        "bus_link": 0x0019,
+    }
+    assert attribute_path(0x0018) == "1/4294048768/24"
+
+
+def test_counters_use_the_state_class_that_survives_a_node_reboot() -> None:
+    # The counts are since boot, so they drop to 0 when the node restarts.
+    # total_increasing treats a drop as a new cycle; total would record it as a
+    # negative step. The ESPHome component declares the same class.
+    hass, entry, coord = make_store(FULL_CONFIG, DIAG | {"reply_timeouts": 250})
+    counter = setup_platform(sensor, hass, entry)[2]
+    assert counter.state_class is SensorStateClass.TOTAL_INCREASING
+    assert counter.last_reset is None
+    coord.data = DIAG | {"reply_timeouts": 0}  # the node rebooted
+    assert counter.native_value == 0
+
+
+# ------------------------------------------------------------------ AC device type
+def test_the_device_type_reads_like_the_esphome_text_sensor() -> None:
+    assert format_link_token(0x0102) == "01 02"
+    assert format_link_token(0xA00F) == "A0 0F"
+    assert format_link_token(0x00FF) == "00 FF"
+    # 0 is "not learned yet"; anything that is not a 16-bit number is not a token.
+    for unknown in (0, None, "0102", True, -1, 0x10000, 1.0):
+        assert format_link_token(unknown) is None
+
+
+def test_the_device_type_entity_exists_only_when_the_node_reports_it() -> None:
+    hass, entry, coord = make_store(FULL_CONFIG, DIAG)
+    added = setup_platform(sensor, hass, entry)
+    assert "AC device type" not in names(added)
+    # Old firmware at setup, updated node on a later poll.
+    coord.data = DIAG | {"link_token": 0x0102}
+    for listener in list(coord.listeners):
+        listener()
+    token = added[-1]
+    assert token.name == "AC device type"
+    assert token.native_value == "01 02"
+    assert token.entity_category is EntityCategory.DIAGNOSTIC
+    assert token.translation_key == "link_token"
+    assert token.unique_id == "e1_link_token"
+    assert token.state_class is None and token.native_unit_of_measurement is None
+
+
+def test_the_device_type_is_unknown_until_the_node_has_learned_it() -> None:
+    hass, entry, coord = make_store(FULL_CONFIG, DIAG | {"link_token": 0})
+    token = setup_platform(sensor, hass, entry)[-1]
+    assert token.name == "AC device type" and token.native_value is None
+    coord.data = DIAG | {"link_token": None}
+    assert token.native_value is None
+    coord.data = None
+    assert token.native_value is None
 
 
 class FakeSocket:
@@ -239,7 +316,7 @@ def read_counters(replies: dict[str, object]) -> tuple[dict, FakeSocket]:
     coord._node_id = 42
     coord.name = "AC diagnostics"
     socket = FakeSocket(replies)
-    return asyncio.run(coord._read_counters(socket)), socket
+    return asyncio.run(coord._read_optional(socket)), socket
 
 
 def test_counters_are_read_from_one_node_snapshot() -> None:

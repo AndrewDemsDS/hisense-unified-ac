@@ -127,26 +127,45 @@ ATTR_COMPRESSOR_HZ = 16  # 0x0010 int8u, Hz
 ATTR_FEATURES1 = 18  # 0x0012 int32u, packed HisenseFeatures
 ATTR_FAULTS1 = 19  # 0x0013 int32u, packed HisenseFaults
 
-# ======================================================================================
-# PROVISIONAL ATTRIBUTE IDS. The firmware side of these four bus counters is not merged,
-# so the ids below are placeholders (the next free ids after Faults1). This table is the
-# only place they live: change the number here when the firmware fixes them and nothing
-# else needs to move.
-#
-# A wrong or unassigned id is harmless. A counter entity is created only when its path
-# "1/<MFG_CLUSTER>/<id>" is present in the node's attribute data as matter-server reports
-# it, so on firmware without the attribute there is no entity at all, and one appears by
-# itself (no reload) once an updated node starts reporting it.
-#
-# key -> (attribute id, entity name, mdi icon). Names and icons are the ESPHome build's
-# (firmware/esphome/w41h1.yaml and components/hisense_ac/sensor.py).
-# ======================================================================================
+# --- Attributes newer firmware adds (all read-only, endpoint 1) -------------------------
+# Not on every node, so nothing below is assumed to exist. An entity backed by one of
+# these is created only when its path "1/<MFG_CLUSTER>/<id>" is present in the node's
+# attribute data as matter-server reports it. On older firmware there is no entity at
+# all, and one appears by itself (no reload) once an updated node starts reporting it.
+ATTR_LINK_TOKEN = 0x0018  # int16u: device type in the high byte, sub type in the low
+ATTR_BUS_LINK = 0x0019  # boolean: the A/C is answering on the RS-485 bus
+
+# The four bus counters, int32u, counted since boot (they restart at 0 when the node
+# reboots). key -> (attribute id, entity name, mdi icon). Names and icons are the ESPHome
+# build's (firmware/esphome/w41h1.yaml and components/hisense_ac/sensor.py).
 BUS_COUNTER_ATTRS: dict[str, tuple[int, str, str]] = {
     "checksum_errors": (0x0014, "Bus checksum errors", "mdi:alert-circle-outline"),
     "reply_timeouts": (0x0015, "Bus reply timeouts", "mdi:timer-alert-outline"),
     "unanswered_commands": (0x0016, "Unanswered commands", "mdi:message-alert-outline"),
     "link_losses": (0x0017, "Bus link losses", "mdi:lan-disconnect"),
 }
+
+# coordinator.data keys for the two attributes above.
+KEY_LINK_TOKEN = "link_token"
+KEY_BUS_LINK = "bus_link"
+# Every optional attribute, by coordinator key. The one table the coordinator reads.
+OPTIONAL_ATTRS: dict[str, int] = {
+    **{key: attr for key, (attr, _name, _icon) in BUS_COUNTER_ATTRS.items()},
+    KEY_LINK_TOKEN: ATTR_LINK_TOKEN,
+    KEY_BUS_LINK: ATTR_BUS_LINK,
+}
+
+
+def format_link_token(value: object) -> str | None:
+    """The device type / sub type pair as the ESPHome build prints it: "HH LL".
+
+    None for anything that is not a learned token: 0 is the firmware's "not learned
+    yet", and the A/C's DevType reply is what fills it in.
+    """
+    if isinstance(value, bool) or not isinstance(value, int) or not 0 < value <= 0xFFFF:
+        return None
+    return f"{value >> 8:02X} {value & 0xFF:02X}"
+
 
 # Bit contract. MUST match HISENSE_FAULT1_* / HISENSE_FEAT1_* in
 # firmware/src/rs485-driver/hisense_rs485.h; a host test in the firmware repo
@@ -245,9 +264,8 @@ SWITCHES: dict[str, tuple[str, str, str]] = {
 #      ("...-<endpoint>-<key>-<cluster>-<attribute>"). This is what still works on a Home
 #      Assistant that ignores the label and names the entity "Switch (3)".
 # key -> (domain, label words, (cluster, attribute), fallback endpoint or None).
-# A None endpoint with label words means the label is the only way in (the beeper: its
-# endpoint number is not part of the contract). A None endpoint with no label words means
-# the cluster and attribute are unique on the node, so any endpoint matches.
+# A None endpoint means the cluster and attribute are unique on the node, so any
+# endpoint matches (the electrical sensors).
 CLUSTER_ONOFF = 6
 CLUSTER_BOOLEAN_STATE = 69  # 0x0045
 CLUSTER_MODE_SELECT = 80  # 0x0050
@@ -258,7 +276,7 @@ SIBLING_RULES: dict[str, tuple[str, tuple[str, ...], tuple[int, int], int | None
     CONF_QUIET: ("switch", ("quiet", "mute"), (CLUSTER_ONOFF, 0), 4),
     CONF_TURBO: ("switch", ("turbo",), (CLUSTER_ONOFF, 0), 5),
     CONF_DISPLAY: ("switch", ("display",), (CLUSTER_ONOFF, 0), 9),
-    CONF_BEEPER: ("switch", ("beeper", "buzzer"), (CLUSTER_ONOFF, 0), None),
+    CONF_BEEPER: ("switch", ("beeper", "buzzer"), (CLUSTER_ONOFF, 0), 11),
     CONF_OUTDOOR_TEMP: ("sensor", ("outdoor",), (CLUSTER_TEMPERATURE, 0), 2),
     CONF_COIL_TEMP: ("sensor", ("coil",), (CLUSTER_TEMPERATURE, 0), 8),
     CONF_VOLTAGE: ("sensor", (), (CLUSTER_ELECTRICAL_POWER, 4), None),

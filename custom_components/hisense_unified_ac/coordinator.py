@@ -5,11 +5,11 @@ matter-server stores every device-reported attribute at a plain numeric path
 "<endpoint>/<cluster_id>/<attribute_id>". We open our own WS connection, read the three
 mfg-cluster diagnostic attributes for one node, and build our own entities (docs/14).
 
-The bus counters are newer than that and not on every firmware, so they are handled
-differently: one `get_node` returns the node's whole attribute cache, and a counter is
-reported only if its path is in it. That costs the device nothing (the cache is filled
-by matter-server's own subscription), and it is what lets the sensor platform create a
-counter entity only on a node that has the attribute.
+The bus counters, the link token and the bus-link flag are newer than that and not on
+every firmware, so they are handled differently: one `get_node` returns the node's whole
+attribute cache, and an attribute is reported only if its path is in it. That costs the
+device nothing (the cache is filled by matter-server's own subscription), and it is what
+lets a platform create an entity only on a node that has the attribute.
 """
 
 from __future__ import annotations
@@ -27,7 +27,8 @@ from .const import (
     ATTR_COMPRESSOR_HZ,
     ATTR_FAULTS1,
     ATTR_FEATURES1,
-    BUS_COUNTER_ATTRS,
+    KEY_BUS_LINK,
+    OPTIONAL_ATTRS,
     DIAG_SCAN_INTERVAL,
     MFG_CLUSTER,
 )
@@ -47,27 +48,31 @@ def attribute_path(attr: int) -> str:
     return f"1/{MFG_CLUSTER}/{attr}"
 
 
-def counters_from_node(node: object) -> dict[str, int | None]:
-    """The bus counters present in a `get_node` result, by coordinator key.
+def optional_from_node(node: object) -> dict[str, int | bool | None]:
+    """The optional attributes present in a `get_node` result, by coordinator key.
 
     A key is in the result only when the node has the attribute at all, which is the
-    signal the sensor platform creates entities from. Present but not a number (a null
+    signal the platforms create entities from. Present but not a usable value (a null
     the firmware has not filled yet) is kept as None: the entity exists, state unknown.
     """
     attributes = node.get("attributes") if isinstance(node, dict) else None
     if not isinstance(attributes, dict):
         return {}
-    out: dict[str, int | None] = {}
-    for key, (attr, _name, _icon) in BUS_COUNTER_ATTRS.items():
+    out: dict[str, int | bool | None] = {}
+    for key, attr in OPTIONAL_ATTRS.items():
         path = attribute_path(attr)
-        if path in attributes:
-            value = attributes[path]
-            is_count = isinstance(value, int) and not isinstance(value, bool)
-            out[key] = value if is_count else None
+        if path not in attributes:
+            continue
+        value = attributes[path]
+        if key == KEY_BUS_LINK:
+            out[key] = value if isinstance(value, bool) else None
+        else:
+            is_number = isinstance(value, int) and not isinstance(value, bool)
+            out[key] = value if is_number else None
     return out
 
 
-class HisenseDiagCoordinator(DataUpdateCoordinator[dict[str, int | None]]):
+class HisenseDiagCoordinator(DataUpdateCoordinator[dict[str, int | bool | None]]):
     """Polls matter-server for one node's raw mfg-cluster diagnostic attributes."""
 
     def __init__(self, hass: HomeAssistant, url: str, node_id: int, name: str) -> None:
@@ -131,27 +136,29 @@ class HisenseDiagCoordinator(DataUpdateCoordinator[dict[str, int | None]]):
                 return None
             return data.get("result")
 
-    async def _read_counters(
+    async def _read_optional(
         self, ws: aiohttp.ClientWebSocketResponse
-    ) -> dict[str, int | None]:
-        """The optional bus counters. Never fails the update: they are an extra."""
+    ) -> dict[str, int | bool | None]:
+        """The optional attributes. Never fails the update: they are an extra."""
         try:
             node = await self._call(
                 ws, "diag-node", "get_node", {"node_id": self._node_id}, "the node"
             )
         except (UpdateFailed, asyncio.TimeoutError) as err:
-            _LOGGER.debug("%s: no node snapshot, counters skipped: %s", self.name, err)
+            _LOGGER.debug(
+                "%s: no node snapshot, optional attributes skipped: %s", self.name, err
+            )
             return {}
-        return counters_from_node(node)
+        return optional_from_node(node)
 
-    async def _async_update_data(self) -> dict[str, int | None]:
-        out: dict[str, int | None] = {}
+    async def _async_update_data(self) -> dict[str, int | bool | None]:
+        out: dict[str, int | bool | None] = {}
         try:
             async with self._session.ws_connect(self._url, heartbeat=30) as ws:
                 await ws.receive(timeout=10)  # consume the server-info greeting
                 for key, attr in _ATTRS.items():
                     out[key] = await self._read(ws, attr)
-                out.update(await self._read_counters(ws))
+                out.update(await self._read_optional(ws))
         except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as err:
             raise UpdateFailed(f"matter-server read failed: {err}") from err
         return out

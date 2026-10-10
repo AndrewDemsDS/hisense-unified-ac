@@ -71,6 +71,9 @@
       "link_losses": {
         "default": "mdi:lan-disconnect"
       },
+      "link_token": {
+        "default": "mdi:identifier"
+      },
       "capabilities": {
         "default": "mdi:format-list-checks"
       }

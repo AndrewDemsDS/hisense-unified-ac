@@ -100,18 +100,23 @@ ESPHome build's, so the two device pages line up row for row.
 | Compressor frequency | sensor | Sensors | diagnostics |
 | Aux heat relay | binary sensor | Sensors | native contact sensor |
 | Fault | binary sensor | Sensors | diagnostics, else the native fault contact sensor |
-| AC bus link | binary sensor | Diagnostic | native climate availability |
+| AC bus link | binary sensor | Diagnostic | diagnostics (newer firmware), else native climate availability |
 | Fault ... (18, one per fault bit) | binary sensor | Diagnostic | diagnostics |
 | Capability ... (13, one per flag) | binary sensor | Diagnostic | diagnostics |
 | Bus checksum errors, Bus reply timeouts, Unanswered commands, Bus link losses | sensor | Diagnostic | diagnostics (newer firmware) |
+| AC device type | sensor | Diagnostic | diagnostics (newer firmware) |
 
 "Diagnostics" means the manufacturer cluster, read straight from the Matter server, so
 those rows need the URL and node id. Everything else works without them.
 
 An entity exists only if the A/C has what backs it. On firmware without the beeper
-endpoint or the bus counters, the Beeper switch and the counter sensors are left out, so
-nothing sits on the device page as unavailable. After a firmware update adds them, the
-switch and the counters appear without touching the integration. If a later firmware
+endpoint, the bus counters or the device type, the Beeper switch and those sensors are
+left out, so nothing sits on the device page as unavailable. After a firmware update adds
+them, they appear without touching the integration.
+
+The bus counters count since the node booted and restart at 0 when it reboots. `AC device
+type` is the type and sub type the A/C reports about itself, shown as two hex bytes
+(`01 02`), and stays unknown until the node has learned it. If a later firmware
 removes an endpoint, its entity is removed at the next reload.
 
 Four of the fault entities and three of the capability entities start enabled, the same
@@ -119,9 +124,9 @@ ones the ESPHome YAML declares (indoor temp sensor, indoor to outdoor comms, con
 tray full, outdoor temp sensor; heat pump, eco, quiet). The rest are created disabled:
 enable any you want under the device's entity list.
 
-Two things the ESPHome device has are not here, because the Matter firmware does not
-report them: `Energy today` and the `AC device type` text sensor. For energy, feed the
-Power sensor to Home Assistant's Riemann sum helper.
+One thing the ESPHome device has is not here, because the Matter firmware does not
+report it: `Energy today`. Feed the Power sensor to Home Assistant's Riemann sum helper
+to get it.
 
 ### How the native entities are found
 
@@ -129,11 +134,10 @@ The endpoint label is tried first. The firmware labels every endpoint (`Eco`, `Q
 `Display`, `Beeper`, `Outdoor`, `Coil`, `Aux Heat`, `Fault`), and Home Assistant puts the
 label in the entity name: `Switch (Beeper)`. If your Home Assistant shows `Switch (3)`
 instead, the endpoint number in the entity's Matter unique id is used (3 eco, 4 quiet,
-5 turbo, 9 display, 2 outdoor, 8 coil, 7 aux heat, 10 fault). Power, voltage and current
-are found by their cluster and attribute.
+5 turbo, 9 display, 11 beeper, 2 outdoor, 8 coil, 7 aux heat, 10 fault). Power, voltage
+and current are found by their cluster and attribute.
 
-The beeper is the exception: its endpoint number is not fixed, so it is found by label
-only. If it is not picked up, choose the switch by hand under **Configure**.
+If a switch is not picked up, choose it by hand under **Configure**.
 
 ### Upgrading from 1.5.0 or earlier
 

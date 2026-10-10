@@ -271,6 +271,16 @@ def test_bus_counters_carry_the_esphome_names_and_icons() -> None:
     assert set(block) == set(BUS_COUNTER_ATTRS) | {
         "compressor_frequency",
         "capabilities",
+        "link_token",
+    }
+
+
+def test_the_device_type_sensor_carries_the_esphome_name_and_icon() -> None:
+    # w41h1.yaml names the link_token text sensor "AC device type"; text_sensor.py gives
+    # it mdi:identifier and the diagnostic category (the category is checked in tier 2).
+    assert '_attr_name = "AC device type"' in _source("sensor.py")
+    assert _json("icons")["entity"]["sensor"]["link_token"] == {
+        "default": "mdi:identifier"
     }
 
 

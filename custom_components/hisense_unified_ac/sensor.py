@@ -6,8 +6,9 @@ Three sources:
     everything. They mirror the native entity and need nothing else.
   * compressor frequency and the capability word come from the mfg cluster, read raw
     through HisenseDiagCoordinator (docs/14), so they need the matter-server URL + node id.
-  * the bus counters come from the same cluster but only exist on newer firmware; an
-    entity is created per counter the node actually reports (const.py, BUS_COUNTER_ATTRS).
+  * the bus counters and the device type come from the same cluster but only exist on
+    newer firmware; an entity is created per attribute the node actually reports
+    (const.py, BUS_COUNTER_ATTRS and ATTR_LINK_TOKEN).
 """
 
 from __future__ import annotations
@@ -40,6 +41,8 @@ from .const import (
     CONF_POWER,
     CONF_VOLTAGE,
     DOMAIN,
+    KEY_LINK_TOKEN,
+    format_link_token,
 )
 from .coordinator import HisenseDiagCoordinator
 from .entity import MirrorEntity, device_info, remove_stale_entities
@@ -80,6 +83,10 @@ MIRRORED: dict[str, tuple[str, str, SensorDeviceClass, str, int]] = {
 }
 
 
+# Coordinator keys that become a sensor only when the node reports the attribute.
+OPTIONAL_SENSORS = (*BUS_COUNTER_ATTRS, KEY_LINK_TOKEN)
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
@@ -95,8 +102,9 @@ async def async_setup_entry(
     if coord is not None:
         entities += [CompressorHzSensor(coord, entry), CapabilitiesSensor(coord, entry)]
         if coord.last_update_success:
-            # Only a successful read can say a counter is gone; a failed one says nothing.
-            absent += [k for k in BUS_COUNTER_ATTRS if k not in (coord.data or {})]
+            # Only a successful read can say an attribute is gone; a failed one says
+            # nothing.
+            absent += [k for k in OPTIONAL_SENSORS if k not in (coord.data or {})]
     remove_stale_entities(hass, entry, "sensor", absent)
     async_add_entities(entities)
 
@@ -105,23 +113,28 @@ async def async_setup_entry(
     known: set[str] = set()
 
     @callback
-    def add_new_counters() -> None:
-        """Create an entity for each counter the node reports that has none yet.
+    def add_new_optional() -> None:
+        """Create an entity for each optional attribute that has none yet.
 
         Runs now and on every poll, so a node that gains the attributes through a
-        firmware update gets its counters without the entry being reloaded.
+        firmware update gets its sensors without the entry being reloaded.
         """
         new = [
             key
-            for key in BUS_COUNTER_ATTRS
+            for key in OPTIONAL_SENSORS
             if key in (coord.data or {}) and key not in known
         ]
         if new:
             known.update(new)
-            async_add_entities(BusCounterSensor(coord, entry, key) for key in new)
+            async_add_entities(
+                LinkTokenSensor(coord, entry)
+                if key == KEY_LINK_TOKEN
+                else BusCounterSensor(coord, entry, key)
+                for key in new
+            )
 
-    add_new_counters()
-    entry.async_on_unload(coord.async_add_listener(add_new_counters))
+    add_new_optional()
+    entry.async_on_unload(coord.async_add_listener(add_new_optional))
 
 
 class MirrorSensor(MirrorEntity, SensorEntity):
@@ -174,7 +187,13 @@ class CompressorHzSensor(CoordinatorEntity[HisenseDiagCoordinator], SensorEntity
 
 
 class BusCounterSensor(CoordinatorEntity[HisenseDiagCoordinator], SensorEntity):
-    """One RS-485 bus counter since boot. A climbing count means trouble on the bus."""
+    """One RS-485 bus counter since boot. A climbing count means trouble on the bus.
+
+    The count restarts at 0 when the node reboots. `total_increasing` is the state
+    class meant for that: Home Assistant's statistics read a drop as a new cycle
+    starting from zero, so a reboot does not show up as a negative step. It is also
+    what the ESPHome component declares for the same counters.
+    """
 
     _attr_has_entity_name = True
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
@@ -194,6 +213,28 @@ class BusCounterSensor(CoordinatorEntity[HisenseDiagCoordinator], SensorEntity):
     @property
     def native_value(self) -> int | None:
         return (self.coordinator.data or {}).get(self._key)
+
+
+class LinkTokenSensor(CoordinatorEntity[HisenseDiagCoordinator], SensorEntity):
+    """The device type / sub type pair the A/C reports in its DevType reply ("HH LL").
+
+    A static per-model identifier the node stamps on its outbound frames. Unknown
+    until the node has learned it (the attribute reads 0 until then).
+    """
+
+    _attr_has_entity_name = True
+    _attr_name = "AC device type"
+    _attr_translation_key = KEY_LINK_TOKEN  # icon in icons.json
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coord: HisenseDiagCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(coord)
+        self._attr_unique_id = f"{entry.entry_id}_{KEY_LINK_TOKEN}"
+        self._attr_device_info = device_info(entry)
+
+    @property
+    def native_value(self) -> str | None:
+        return format_link_token((self.coordinator.data or {}).get(KEY_LINK_TOKEN))
 
 
 class CapabilitiesSensor(CoordinatorEntity[HisenseDiagCoordinator], SensorEntity):

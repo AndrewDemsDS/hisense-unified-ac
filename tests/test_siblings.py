@@ -126,15 +126,22 @@ def test_registry_order_does_not_change_the_answer() -> None:
     assert match_siblings(list(reversed(labelled()))) == match_siblings(labelled())
 
 
-def test_the_beeper_is_found_by_label_and_only_by_label() -> None:
+def test_the_beeper_is_found_by_label_or_by_its_endpoint() -> None:
     found = match_siblings(labelled([*ENDPOINTS, BEEPER]))
     assert found["beeper_switch"] == "switch.ac_11"
     # "Buzzer" is the word the owner uses for it, so it is accepted too.
     buzzer = (BEEPER[0], "Switch (Buzzer)", BEEPER[2], BEEPER[3])
     assert match_siblings(labelled([*ENDPOINTS, buzzer]))["beeper_switch"] == BEEPER[0]
-    # Its endpoint number is not part of the firmware contract, so an unlabelled OnOff
-    # endpoint is never guessed to be the beeper.
-    assert "beeper_switch" not in match_siblings(numbered([*ENDPOINTS, BEEPER]))
+    # A Home Assistant that ignores the label calls it "Switch (11)". The beeper is
+    # endpoint 11 on both firmwares, so the unique id still finds it.
+    assert match_siblings(numbered([*ENDPOINTS, BEEPER]))["beeper_switch"] == BEEPER[0]
+
+
+def test_an_unlabelled_switch_on_an_unknown_endpoint_fills_no_role() -> None:
+    stray = ("switch.ac_12", "Switch (12)", "Switch (12)", uid(12, "MatterPlug", 6, 0))
+    found = match_siblings(numbered([*ENDPOINTS, stray]))
+    assert "switch.ac_12" not in found.values()
+    assert "beeper_switch" not in found
 
 
 def test_firmware_without_a_beeper_or_display_yields_no_such_role() -> None:

@@ -191,12 +191,48 @@ def test_no_aux_heat_entity_without_the_endpoint_and_a_stale_one_is_removed() ->
 
 
 def test_bus_link_follows_the_base_climates_availability() -> None:
+    # Older firmware, or no diagnostics at all: inferred from the native climate.
     link = BusLinkBinarySensor(ENTRY)
     attach(link, {"climate.b": state("cool")})
     assert link.is_on is True
     attach(link, {"climate.b": state("unavailable")})
     assert link.is_on is False
     attach(link, {})
+    assert link.is_on is False
+
+
+def bus_link(diag: dict, climate: str = "cool") -> tuple[BusLinkBinarySensor, object]:
+    hass, entry, coord = make_store(FULL_CONFIG, diag)
+    link = by_name(setup_platform(binary_sensor, hass, entry))["AC bus link"]
+    attach(link, {"climate.b": state(climate)})
+    return link, coord
+
+
+def test_bus_link_uses_the_firmwares_own_flag_when_the_node_reports_one() -> None:
+    # The flag wins in both directions over what the climate entity suggests.
+    link, _ = bus_link(DIAG | {"bus_link": False}, climate="cool")
+    assert link.is_on is False
+    link, _ = bus_link(DIAG | {"bus_link": True}, climate="unavailable")
+    assert link.is_on is True
+    assert link.unique_id == "e1_bus_link"  # the same entity either way
+
+
+def test_bus_link_falls_back_to_the_inference_without_a_usable_flag() -> None:
+    # Firmware without the attribute.
+    link, _ = bus_link(DIAG, climate="unavailable")
+    assert link.is_on is False
+    link, _ = bus_link(DIAG, climate="cool")
+    assert link.is_on is True
+    # Attribute present but not filled in yet.
+    link, _ = bus_link(DIAG | {"bus_link": None}, climate="cool")
+    assert link.is_on is True
+    # matter-server stopped answering: the last flag is stale, so it is not trusted.
+    link, coord = bus_link(DIAG | {"bus_link": True}, climate="unavailable")
+    coord.last_update_success = False
+    assert link.is_on is False
+    # A failed first poll leaves no data at all.
+    coord.data = None
+    coord.last_update_success = True
     assert link.is_on is False
 
 

@@ -7,8 +7,9 @@ entity, as on the ESPHome device, so an automation can act on "condensate tray f
 without parsing attributes. The ones the ESPHome YAML declares are enabled; the rest are
 created disabled.
 
-Bus link mirrors the firmware's #56 liveness (the base climate entity goes unavailable
-on bus silence), needing no firmware/matter-server change (docs/14 Phase 1b). Aux heat
+Bus link is the firmware's own BusLink attribute where the node has it, and otherwise
+mirrors the firmware's #56 liveness (the base climate entity goes unavailable on bus
+silence), which needs no firmware/matter-server support (docs/14 Phase 1b). Aux heat
 mirrors the native contact sensor on the aux-heat endpoint.
 """
 
@@ -38,6 +39,7 @@ from .const import (
     FAULTS1_VALID_BIT,
     FAULTS_ENABLED_BY_DEFAULT,
     FEAT1_BITS,
+    KEY_BUS_LINK,
 )
 from .coordinator import HisenseDiagCoordinator
 from .entity import (
@@ -76,7 +78,7 @@ async def async_setup_entry(
         # the matter-server URL later upgrades this entity instead of adding a second.
         entities.append(MirrorFaultBinarySensor(entry, fault))
     if entry.data.get(CONF_BASE_CLIMATE):
-        entities.append(BusLinkBinarySensor(entry))
+        entities.append(BusLinkBinarySensor(entry, coord))
     if aux := config.get(CONF_AUX_HEAT):
         entities.append(AuxHeatBinarySensor(entry, aux))
     else:
@@ -245,9 +247,12 @@ class CapabilityBinarySensor(
 class BusLinkBinarySensor(BinarySensorEntity):
     """CONNECTIVITY sensor: on while the RS-485 bus is alive.
 
-    The firmware nulls the standard liveness attributes on bus silence (#56), so the base
-    climate entity goes unavailable. We simply mirror that, with no firmware/matter-server
-    dependency.
+    Newer firmware reports this itself (the BusLink attribute), and that is used
+    whenever the last diagnostics poll carried it. Otherwise it is inferred: the
+    firmware nulls the standard liveness attributes on bus silence (#56), so the base
+    climate entity goes unavailable, and this mirrors that. The inference needs no
+    firmware or matter-server support, so it is also what covers a node on older
+    firmware, an entry with no diagnostics, and a matter-server that is not answering.
     """
 
     _attr_has_entity_name = True
@@ -256,8 +261,11 @@ class BusLinkBinarySensor(BinarySensorEntity):
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_should_poll = False
 
-    def __init__(self, entry: ConfigEntry) -> None:
+    def __init__(
+        self, entry: ConfigEntry, coord: HisenseDiagCoordinator | None = None
+    ) -> None:
         self._base = entry.data[CONF_BASE_CLIMATE]
+        self._coord = coord
         self._attr_unique_id = f"{entry.entry_id}_bus_link"
         self._attr_device_info = device_info(entry)
 
@@ -265,12 +273,28 @@ class BusLinkBinarySensor(BinarySensorEntity):
         self.async_on_remove(
             async_track_state_change_event(self.hass, [self._base], self._changed)
         )
+        if self._coord is not None:
+            self.async_on_remove(self._coord.async_add_listener(self._polled))
 
     @callback
     def _changed(self, _event: Event) -> None:
         self.async_write_ha_state()
 
+    @callback
+    def _polled(self) -> None:
+        self.async_write_ha_state()
+
+    def _reported(self) -> bool | None:
+        """What the firmware says, or None when it has not said anything usable."""
+        coord = self._coord
+        if coord is None or not coord.last_update_success:
+            return None
+        value = _data(coord).get(KEY_BUS_LINK)
+        return value if isinstance(value, bool) else None
+
     @property
     def is_on(self) -> bool:
+        if (reported := self._reported()) is not None:
+            return reported
         state = self.hass.states.get(self._base)
         return bool(state and state.state not in UNAVAILABLE_STATES)
