@@ -5,8 +5,8 @@
 #   ./run_tests.sh --container  run the HA-dependent tests inside a running HA container
 #
 # Three tiers, cheapest first:
-#   1. pure       capability decoding + metadata drift. No dependencies at all.
-#   2. entity     climate + select behaviour against stub state. Needs `homeassistant`.
+#   1. pure       capability decoding, sibling matching, metadata drift. No dependencies.
+#   2. entity     every platform's behaviour against stub state. Needs `homeassistant`.
 #   3. hardware   tests/hil/, opt-in, commands a real A/C. Never run from here.
 #
 # Tier 2 is skipped with a warning when homeassistant is missing, so the dev box does not
@@ -14,8 +14,11 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 
-PURE_TESTS=(tests/test_features.py tests/test_metadata.py)
-ENTITY_TESTS=(tests/test_climate.py tests/test_select.py)
+PURE_TESTS=(tests/test_features.py tests/test_siblings.py tests/test_metadata.py)
+ENTITY_TESTS=(
+  tests/test_climate.py tests/test_select.py tests/test_switch.py tests/test_sensor.py
+  tests/test_binary_sensor.py tests/test_discovery.py
+)
 
 # --container: copy the suite into a running HA container and run it there. That is the
 # quickest way to test against the exact HA version the units are actually talking to.

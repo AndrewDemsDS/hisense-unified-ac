@@ -33,85 +33,90 @@
         }
       }
     },
+    "switch": {
+      "eco": {
+        "default": "mdi:leaf"
+      },
+      "turbo": {
+        "default": "mdi:fan-plus"
+      },
+      "quiet": {
+        "default": "mdi:volume-off"
+      },
+      "display": {
+        "default": "mdi:television-ambient-light"
+      },
+      "beeper": {
+        "default": "mdi:volume-high"
+      }
+    },
     "select": {
       "sleep_profile": {
-        "default": "mdi:bed-clock"
+        "default": "mdi:sleep"
       }
     },
     "sensor": {
       "compressor_frequency": {
         "default": "mdi:sine-wave"
       },
+      "checksum_errors": {
+        "default": "mdi:alert-circle-outline"
+      },
+      "reply_timeouts": {
+        "default": "mdi:timer-alert-outline"
+      },
+      "unanswered_commands": {
+        "default": "mdi:message-alert-outline"
+      },
+      "link_losses": {
+        "default": "mdi:lan-disconnect"
+      },
+      "link_token": {
+        "default": "mdi:identifier"
+      },
       "capabilities": {
         "default": "mdi:format-list-checks"
       }
     },
     "binary_sensor": {
-      "faults": {
-        "default": "mdi:shield-check",
-        "state": {
-          "on": "mdi:shield-alert"
-        }
+      "capability_cool_heat": {
+        "default": "mdi:heat-pump"
       },
-      "bus_link": {
-        "default": "mdi:lan-disconnect",
-        "state": {
-          "on": "mdi:lan-connect"
-        }
+      "capability_ai": {
+        "default": "mdi:brain"
       },
-      "in_temp": {
-        "default": "mdi:thermometer"
-      },
-      "in_coil_temp": {
-        "default": "mdi:coolant-temperature"
-      },
-      "in_humidity": {
-        "default": "mdi:water-percent"
-      },
-      "water_full": {
-        "default": "mdi:cup-water"
-      },
-      "in_fan_motor": {
+      "capability_infinite_fan": {
         "default": "mdi:fan"
       },
-      "grille": {
-        "default": "mdi:arrow-up-down-bold"
+      "capability_power_save": {
+        "default": "mdi:leaf"
       },
-      "in_vzero": {
-        "default": "mdi:sine-wave"
+      "capability_fan_mute": {
+        "default": "mdi:volume-off"
       },
-      "in_com": {
+      "capability_swing_dir_8": {
+        "default": "mdi:arrow-up-down"
+      },
+      "capability_swing_follow": {
+        "default": "mdi:arrow-oscillating"
+      },
+      "capability_humidity": {
+        "default": "mdi:water-percent"
+      },
+      "capability_heat_8c": {
+        "default": "mdi:snowflake-thermometer"
+      },
+      "capability_purify": {
+        "default": "mdi:air-purifier"
+      },
+      "capability_q_display": {
+        "default": "mdi:television-ambient-light"
+      },
+      "capability_enable_8heat": {
+        "default": "mdi:snowflake-thermometer"
+      },
+      "capability_trans_102_64": {
         "default": "mdi:swap-horizontal"
-      },
-      "in_display": {
-        "default": "mdi:monitor"
-      },
-      "in_keys": {
-        "default": "mdi:keyboard"
-      },
-      "in_wifi": {
-        "default": "mdi:wifi"
-      },
-      "in_ele": {
-        "default": "mdi:flash"
-      },
-      "in_eeprom": {
-        "default": "mdi:memory"
-      },
-      "out_eeprom": {
-        "default": "mdi:memory"
-      },
-      "out_coil_temp": {
-        "default": "mdi:coolant-temperature"
-      },
-      "out_gas_temp": {
-        "default": "mdi:thermometer-lines"
-      },
-      "out_temp": {
-        "default": "mdi:thermometer"
-      },
-      "over_temp": {
-        "default": "mdi:thermometer-high"
       }
     }
   }

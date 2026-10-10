@@ -16,6 +16,11 @@ Hisense **AEH-W41H1** A/C's native Matter entities into **one climate entity**:
 Each of those is advertised only if *this* unit has it (see
 [Capability matrix](#capability-matrix)).
 
+Around that climate entity it builds one device with the same entities, names, icons and
+grouping as the [hisense-w41h1 ESPHome build](https://github.com/AndrewDemsDS/hisense-w41h1/blob/main/docs/guide/ESPHome-Build.md),
+so an A/C looks the same in Home Assistant whichever firmware it runs. See
+[Entities](#entities).
+
 It replaces the hand-maintained `climate_template` YAML package: units are added
 through the UI (config flow), one entry per A/C.
 
@@ -44,6 +49,11 @@ redundant device-mandated Power switch, and unnamed On/Off switches for the
 special modes. This wraps them into a single thermostat card, so the redundant
 tiles can be hidden and the special modes live inside the climate as presets.
 
+The native device page is also hard to read: `Switch (Eco)`, `Temperature (Coil)`,
+`Door (Aux Heat)`. The unified device re-exposes those under plain names (`Eco`,
+`Coil temperature`, `Aux heat relay`) next to the diagnostics the Matter integration
+cannot show at all.
+
 ## Requirements
 
 - The A/C already commissioned into HA over Matter.
@@ -59,12 +69,84 @@ tiles can be hidden and the special modes live inside the climate as presets.
    **Integration**.
 2. Install **Hisense W41H1 Unified AC**, restart HA.
 3. Settings → Devices & Services → **Add Integration** → *Hisense W41H1 Unified
-   AC* → pick the A/C's native Matter **climate** entity. The fan / eco-quiet-turbo
-   switches / sleep select are auto-detected from the same device (override any if
+   AC* → pick the A/C's native Matter **climate** entity. The fan, switches, sleep
+   select and sensors are auto-detected from the same device (override any if
    needed). Repeat per A/C.
 
-Then hide the now-redundant native entities (the Power switch and the raw
-special-mode switches) if you like — the unified entity covers them.
+The form also asks for the Matter server WebSocket URL and the Matter node id, which the
+diagnostics entities need. Both are filled in for you: the URL is the one Home
+Assistant's own Matter integration uses, and the node id is read from the climate entity
+when the field is left empty. Clear the URL to set the A/C up without diagnostics. Both
+can be changed later under **Configure**.
+
+The native Matter device keeps all of its own entities. Nothing is hidden or disabled
+for you, so if you only want the unified device on your dashboards, disable or hide the
+native ones yourself.
+
+## Entities
+
+The unified device carries these. Names, icons, device classes and categories are the
+ESPHome build's, so the two device pages line up row for row.
+
+| Entity | Platform | Group | From |
+| --- | --- | --- | --- |
+| (device name) | climate | Controls | native climate + fan + special modes |
+| Sleep profile | select | Controls | native sleep select |
+| Eco, Turbo, Quiet | switch | Configuration | native switches, also offered as presets |
+| Panel display | switch | Configuration | native `Display` switch |
+| Beeper | switch | Configuration | native `Beeper` switch (newer firmware) |
+| Outdoor temperature, Coil temperature | sensor | Sensors | native temperature sensors |
+| Power, Voltage, Current | sensor | Sensors | native electrical sensors |
+| Compressor frequency | sensor | Sensors | diagnostics |
+| Aux heat relay | binary sensor | Sensors | native contact sensor |
+| Fault | binary sensor | Sensors | diagnostics, else the native fault contact sensor |
+| AC bus link | binary sensor | Diagnostic | diagnostics (newer firmware), else native climate availability |
+| Fault ... (18, one per fault bit) | binary sensor | Diagnostic | diagnostics |
+| Capability ... (13, one per flag) | binary sensor | Diagnostic | diagnostics |
+| Bus checksum errors, Bus reply timeouts, Unanswered commands, Bus link losses | sensor | Diagnostic | diagnostics (newer firmware) |
+| AC device type | sensor | Diagnostic | diagnostics (newer firmware) |
+
+"Diagnostics" means the manufacturer cluster, read straight from the Matter server, so
+those rows need the URL and node id. Everything else works without them.
+
+An entity exists only if the A/C has what backs it. On firmware without the beeper
+endpoint, the bus counters or the device type, the Beeper switch and those sensors are
+left out, so nothing sits on the device page as unavailable. After a firmware update adds
+them, they appear without touching the integration.
+
+The bus counters count since the node booted and restart at 0 when it reboots. `AC device
+type` is the type and sub type the A/C reports about itself, shown as two hex bytes
+(`01 02`), and stays unknown until the node has learned it. If a later firmware
+removes an endpoint, its entity is removed at the next reload.
+
+Four of the fault entities and three of the capability entities start enabled, the same
+ones the ESPHome YAML declares (indoor temp sensor, indoor to outdoor comms, condensate
+tray full, outdoor temp sensor; heat pump, eco, quiet). The rest are created disabled:
+enable any you want under the device's entity list.
+
+One thing the ESPHome device has is not here, because the Matter firmware does not
+report it: `Energy today`. Feed the Power sensor to Home Assistant's Riemann sum helper
+to get it.
+
+### How the native entities are found
+
+The endpoint label is tried first. The firmware labels every endpoint (`Eco`, `Quiet`, `Turbo`,
+`Display`, `Beeper`, `Outdoor`, `Coil`, `Aux Heat`, `Fault`), and Home Assistant puts the
+label in the entity name: `Switch (Beeper)`. If your Home Assistant shows `Switch (3)`
+instead, the endpoint number in the entity's Matter unique id is used (3 eco, 4 quiet,
+5 turbo, 9 display, 11 beeper, 2 outdoor, 8 coil, 7 aux heat, 10 fault). Power, voltage
+and current are found by their cluster and attribute.
+
+If a switch is not picked up, choose it by hand under **Configure**.
+
+### Upgrading from 1.5.0 or earlier
+
+Nothing has to be re-added and no entity id changes. An existing entry gets the new
+switches and sensors at the next start. Three existing entities are renamed to match the
+ESPHome build (`Faults` to `Fault`, `Bus link` to `AC bus link`, and the per-fault
+entities to `Fault ...`), which changes their displayed name only. Entities you already
+have stay enabled, including the `Capabilities` summary sensor, which is off by default
+on new installs now that each flag has its own entity.
 
 ## Capability matrix
 
@@ -85,8 +167,9 @@ HA rejects the command outright instead of accepting it and dropping it silently
 Two sources, in order. The **native Matter climate's own mode list** is the ground
 truth for HVAC modes: the firmware already gates its Thermostat FeatureMap per
 capability, so mirroring it also picks up the dry / fan-only unlock. The **capability
-word** (the `Capabilities` diagnostic sensor, mfg cluster attr `0x0012`) gates the
-presets, and covers HVAC modes while the native entity is unavailable.
+word** (the `Capability ...` diagnostic entities, mfg cluster attr `0x0012`) gates the
+presets and the Eco and Quiet switches, and covers HVAC modes while the native entity is
+unavailable.
 
 Gating is permissive: **unknown is not unsupported**. A unit that never reported a
 capability word, or reported an invalid one, gets everything offered. This mirrors the

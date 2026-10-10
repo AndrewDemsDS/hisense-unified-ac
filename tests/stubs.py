@@ -114,6 +114,122 @@ def make_select(states: dict[str, Any] | None = None, sleep_entity: str = "selec
     return entity, recorder
 
 
+class FakeRegistry:
+    """Just enough entity registry for discovery and the stale-entity cleanup.
+
+    `rows` are SimpleNamespace(entity_id, device_id, platform, unique_id, original_name,
+    name, disabled_by). Removals are recorded, not applied, so a test can assert on them.
+    """
+
+    def __init__(self, rows: list[SimpleNamespace] | None = None) -> None:
+        self.entities = {row.entity_id: row for row in rows or []}
+        self.removed: list[str] = []
+
+    def async_get(self, entity_id: str) -> SimpleNamespace | None:
+        return self.entities.get(entity_id)
+
+    def async_get_entity_id(self, domain: str, platform: str, unique_id: str):
+        for row in self.entities.values():
+            if (
+                row.entity_id.split(".", 1)[0] == domain
+                and row.platform == platform
+                and row.unique_id == unique_id
+            ):
+                return row.entity_id
+        return None
+
+    def async_remove(self, entity_id: str) -> None:
+        self.removed.append(entity_id)
+
+
+def row(
+    entity_id: str,
+    unique_id: str = "",
+    original_name: str | None = None,
+    *,
+    device_id: str | None = "dev1",
+    platform: str = "matter",
+    disabled_by: str | None = None,
+) -> SimpleNamespace:
+    """One entity registry row."""
+    return SimpleNamespace(
+        entity_id=entity_id,
+        device_id=device_id,
+        platform=platform,
+        unique_id=unique_id,
+        original_name=original_name,
+        name=None,
+        disabled_by=disabled_by,
+    )
+
+
+class use_registry:
+    """Context manager: make er.async_get(hass) return `registry` for the duration."""
+
+    def __init__(self, registry: FakeRegistry) -> None:
+        self.registry = registry
+
+    def __enter__(self) -> FakeRegistry:
+        from homeassistant.helpers import entity_registry as er
+
+        self._er, self._real = er, er.async_get
+        er.async_get = lambda _hass: self.registry
+        return self.registry
+
+    def __exit__(self, *_exc: object) -> None:
+        self._er.async_get = self._real
+
+
+def make_store(
+    config: dict[str, Any] | None = None, diag: dict[str, Any] | None = None
+) -> tuple[SimpleNamespace, SimpleNamespace, SimpleNamespace | None]:
+    """(hass, entry, coordinator) for a platform's async_setup_entry.
+
+    `diag` is the coordinator's last poll; None means no diagnostics were configured.
+    The coordinator stub records its listeners so a test can fire the next poll.
+    """
+    from hisense_unified_ac.const import DOMAIN
+
+    cfg = dict(FULL_CONFIG if config is None else config)
+    coord = None
+    if diag is not None:
+        listeners: list = []
+
+        def add_listener(callback, _context=None):
+            listeners.append(callback)
+            return lambda: listeners.remove(callback)
+
+        coord = SimpleNamespace(
+            data=dict(diag),
+            last_update_success=True,
+            listeners=listeners,
+            async_add_listener=add_listener,
+        )
+    unloads: list = []
+    entry = SimpleNamespace(
+        data=cfg, options={}, entry_id="e1", async_on_unload=unloads.append
+    )
+    store = {"config": cfg}
+    if coord is not None:
+        store["diag"] = coord
+    hass = SimpleNamespace(data={DOMAIN: {"e1": store}})
+    return hass, entry, coord
+
+
+def setup_platform(module, hass, entry, registry: FakeRegistry | None = None) -> list:
+    """Run a platform's async_setup_entry; returns the list entities are added to."""
+    added: list = []
+    with use_registry(registry or FakeRegistry()):
+        asyncio.run(module.async_setup_entry(hass, entry, added.extend))
+    return added
+
+
+def attach(entity, states: dict[str, Any]) -> Recorder:
+    """Give a bare entity a stub hass; returns the service-call recorder."""
+    entity.hass, recorder = make_hass(states)
+    return recorder
+
+
 def run(coro) -> Any:
     """Run one coroutine to completion."""
     return asyncio.run(coro)

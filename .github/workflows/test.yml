@@ -20,7 +20,10 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          # Must be a Python the current Home Assistant release supports. On an older one
+          # pip silently installs the last release that did, and the daily run stops
+          # tracking upstream without failing.
+          python-version: "3.14"
 
       - name: Install
         run: |
