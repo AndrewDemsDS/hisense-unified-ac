@@ -1,5 +1,11 @@
 # Hisense W41H1 Unified AC
 
+> **Retired on 2026-10-27.** This integration needs the de-cloud Matter firmware, which was
+> retired on 2026-10-12 (last tree: the tag `matter-final` of
+> [hisense-w41h1](https://github.com/AndrewDemsDS/hisense-w41h1)). The firmware is ESPHome only
+> now and gives Home Assistant the climate entity and the other entities directly, so nothing
+> here is needed. The repository is archived and read-only.
+
 A Home Assistant custom integration (HACS-compatible) that merges a de-clouded
 Hisense **AEH-W41H1** A/C's native Matter entities into **one climate entity**:
 
